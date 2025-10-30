@@ -1,8 +1,4 @@
-// Initialize Firebase using the global (namespaced/UMD) SDK loaded from CDN
-// This file provides a compatibility wrapper so existing v8-style auth code
-// (e.g. `auth.signInWithEmailAndPassword`) can continue to work.
-
-// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyAvdQCbDjsHd8U3fgZ0vEuxBj_kQDX8CEo",
   authDomain: "smartstock-ffa43.firebaseapp.com",
@@ -13,17 +9,23 @@ const firebaseConfig = {
   measurementId: "G-C1KPTCKGV5"
 };
 
-// The pages load the Firebase CDN scripts (firebase-app.js and firebase-auth.js)
-// which expose a global `firebase` namespace (UMD). Initialize using that
-// global and expose `auth` so existing auth.js code works unchanged.
+// Initialize Firebase using the compat (namespaced) API that the pages expect.
+// This file assumes the compat CDN scripts are included before this script.
 if (typeof firebase !== 'undefined' && firebase.initializeApp) {
-  firebase.initializeApp(firebaseConfig);
-  // Create auth instance and expose globally
-  window.auth = firebase.auth();
-  // If analytics is available, initialize it (optional)
-  if (firebase.analytics) {
-    try { window.analytics = firebase.analytics(); } catch(e) { /* ignore */ }
+  try {
+    // Avoid re-initializing if app already exists
+    if (!firebase.apps || firebase.apps.length === 0) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    // Expose the auth instance used by other scripts
+    window.auth = firebase.auth();
+    // Optionally expose analytics if available
+    if (firebase.analytics) {
+      try { window.analytics = firebase.analytics(); } catch(e) { /* ignore */ }
+    }
+  } catch (e) {
+    console.error('Error initializing Firebase:', e);
   }
 } else {
-  console.error('Firebase SDK not found. Make sure you included the firebase-app.js and firebase-auth.js scripts before firebase.js');
+  console.error('Firebase compat SDK not found. Make sure you include the compat scripts (firebase-app-compat.js and firebase-auth-compat.js) before firebase.js');
 }
