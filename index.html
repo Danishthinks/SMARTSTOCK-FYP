@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SMARTSTOCK Dashboard Prototype</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f6fa;
+    }
+    .sidebar {
+      width: 230px;
+      background: #1e1e2d;
+      color: white;
+      height: 100vh;
+      position: fixed;
+      padding: 20px;
+    }
+    .sidebar h2 {
+      font-size: 22px;
+      margin-bottom: 30px;
+    }
+    .sidebar a {
+      color: white;
+      text-decoration: none;
+      display: block;
+      margin: 12px 0;
+      font-size: 15px;
+    }
+    .main {
+      margin-left: 230px;
+      padding: 20px;
+    }
+    .header {
+      font-size: 22px;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+    .cards {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      width: 250px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .chart-placeholder {
+      margin-top: 25px;
+      background: white;
+      height: 300px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 18px;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h2>SMARTSTOCK</h2>
+    <a href="#">🏠 Dashboard</a>
+    <a href="#">📦 Inventory</a>
+    <a href="#">🏭 Warehouses</a>
+    <a href="#">📊 Reports</a>
+    <a href="#">🔮 Forecasting</a>
+    <a href="#">⚙️ Settings</a>
+  </div>
+
+  <div class="main">
+    <div class="header">Dashboard Overview</div>
+
+    <div class="cards">
+      <div class="card">
+        <b>Total Products</b>
+        <h2>120</h2>
+      </div>
+      <div class="card">
+        <b>Low Stock Items</b>
+        <h2>08</h2>
+      </div>
+      <div class="card">
+        <b>Warehouses</b>
+        <h2>02</h2>
+      </div>
+      <div class="card">
+        <b>Predicted Restocks</b>
+        <h2>05</h2>
+      </div>
+    </div>
+
+    <div class="chart-placeholder">
+      📈 Sales & Stock Trend Chart Placeholder
+    </div>
+  </div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
+<script src="firebase.js"></script>
+<script src="auth.js"></script>
+
+<script>
+auth.onAuthStateChanged(user => {
+  if (!user) window.location.href = "login.html";
+});
+</script>
+
+
+</body>
+</html>
+
