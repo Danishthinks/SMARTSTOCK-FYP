@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventory - SMARTSTOCK</title>
+<style>
+:root{
+  --bg:#f5f7fa;
+  --sidebar:#1f2937;
+  --primary:#2563eb;
+  --white:#fff;
+  --text-dark:#111827;
+}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial;}
+body{display:flex;background:var(--bg);}
+
+/* sidebar */
+.sidebar{width:230px;background:var(--sidebar);color:#fff;height:100vh;position:fixed;padding:25px;}
+.logo{font-size:22px;font-weight:600;margin-bottom:25px;text-align:center;}
+.nav-link{
+  color:#d1d5db;text-decoration:none;display:block;padding:12px;border-radius:8px;margin-bottom:8px;font-size:15px;
+}
+.nav-link:hover, .active{background:rgba(255,255,255,0.12);color:#fff;}
+
+/* main */
+.main{margin-left:230px;padding:35px;width:100%;}
+.heading{font-size:22px;font-weight:bold;margin-bottom:20px;color:var(--text-dark);}
+
+/* Table */
+table{
+  width:100%;
+  border-collapse:collapse;
+  background:white;
+  box-shadow:0 4px 10px rgba(0,0,0,0.08);
+}
+th,td{
+  padding:12px;
+  border-bottom:1px solid #e5e7eb;
+  text-align:left;
+  font-size:14px;
+}
+th{background:#eef2ff;font-weight:bold;color:#111;}
+.action-btn{
+  cursor:pointer;
+  padding:6px 10px;
+  border-radius:6px;
+  font-size:13px;
+  border:none;
+  margin-right:5px;
+}
+.edit{background:#facc15;color:#000;}
+.delete{background:#ef4444;color:#fff;}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="logo">SMARTSTOCK</div>
+  <a class="nav-link" href="index.html">Dashboard</a>
+  <a class="nav-link" href="add-inventory.html">Add Product</a>
+  <a class="nav-link active" href="inventory.html">Inventory List</a>
+</div>
+
+<!-- Main Content -->
+<div class="main">
+  <div class="heading">Inventory List</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Category</th>
+        <th>Qty</th>
+        <th>Buy Price</th>
+        <th>Sell Price</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    
+    <tbody id="productTable"></tbody>
+  </table>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
+
+<script>
+// ✅ Real-time Display
+db.collection("products").orderBy("createdAt","desc").onSnapshot(snapshot=>{
+  let table = "";
+  snapshot.forEach(doc=>{
+    const p = doc.data();
+    table += `
+      <tr>
+        <td>${p.name}</td>
+        <td>${p.category}</td>
+        <td>${p.quantity}</td>
+        <td>${p.purchasePrice}</td>
+        <td>${p.sellingPrice}</td>
+        <td>
+          <button class="action-btn edit" onclick="editProduct('${doc.id}')">Edit</button>
+          <button class="action-btn delete" onclick="deleteProduct('${doc.id}')">Delete</button>
+        </td>
+      </tr>
+    `;
+  });
+  document.getElementById("productTable").innerHTML = table;
+});
+
+// 🗑 Delete Product (function empty for now)
+function deleteProduct(id){
+  alert("Delete function will be added next ✅");
+}
+
+// ✏ Edit Product (function empty for now)
+function editProduct(id){
+  alert("Edit form coming next ✅");
+}
+</script>
+
+</body>
+</html>

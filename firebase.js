@@ -17,8 +17,9 @@ if (typeof firebase !== 'undefined' && firebase.initializeApp) {
     if (!firebase.apps || firebase.apps.length === 0) {
       firebase.initializeApp(firebaseConfig);
     }
-    // Expose the auth instance used by other scripts
+    // Expose instances used by other scripts
     window.auth = firebase.auth();
+    window.db = firebase.firestore();
     // Optionally expose analytics if available
     if (firebase.analytics) {
       try { window.analytics = firebase.analytics(); } catch(e) { /* ignore */ }
@@ -27,5 +28,5 @@ if (typeof firebase !== 'undefined' && firebase.initializeApp) {
     console.error('Error initializing Firebase:', e);
   }
 } else {
-  console.error('Firebase compat SDK not found. Make sure you include the compat scripts (firebase-app-compat.js and firebase-auth-compat.js) before firebase.js');
+  console.error('Firebase compat SDK not found. Make sure you include the compat scripts before firebase.js');
 }

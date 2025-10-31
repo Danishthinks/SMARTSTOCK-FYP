@@ -3,116 +3,72 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SMARTSTOCK Dashboard Prototype</title>
+  <title>SMARTSTOCK Dashboard</title>
   <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f5f6fa;
+    :root {
+      --bg:#f7f9fb;
+      --sidebar:#1f2937;
+      --primary:#2563eb;
+      --card:#ffffff;
+      --text-dark:#111827;
+      --text-light:#6b7280;
     }
-    .sidebar {
-      width: 230px;
-      background: #1e1e2d;
-      color: white;
-      height: 100vh;
-      position: fixed;
-      padding: 20px;
+    *{box-sizing:border-box;margin:0;padding:0;font-family:Arial, sans-serif;}
+    body{background:var(--bg);display:flex;}
+
+    /* Sidebar */
+    .sidebar{
+      width:230px;background:var(--sidebar);color:#fff;height:100vh;position:fixed;padding:25px 15px;display:flex;flex-direction:column;gap:10px;
     }
-    .sidebar h2 {
-      font-size: 22px;
-      margin-bottom: 30px;
+    .logo{font-size:22px;font-weight:600;margin-bottom:25px;text-align:center;}
+    .nav-link{
+      padding:12px;border-radius:8px;color:#d1d5db;text-decoration:none;font-size:15px;display:block;transition:0.2s;
     }
-    .sidebar a {
-      color: white;
-      text-decoration: none;
-      display: block;
-      margin: 12px 0;
-      font-size: 15px;
+    .nav-link:hover,.nav-link.active{background:rgba(255,255,255,0.12);color:#fff;transform:translateX(3px);}
+
+    /* Main */
+    .main{margin-left:230px;padding:30px;width:100%;}
+    .header{font-size:24px;font-weight:600;color:var(--text-dark);margin-bottom:20px;}
+
+    /* Cards */
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;}
+    .card{
+      background:var(--card);border-radius:12px;padding:20px;box-shadow:0 3px 10px rgba(0,0,0,0.06);transition:0.2s;
     }
-    .main {
-      margin-left: 230px;
-      padding: 20px;
-    }
-    .header {
-      font-size: 22px;
-      font-weight: bold;
-      margin-bottom: 20px;
-    }
-    .cards {
-      display: flex;
-      gap: 20px;
-      flex-wrap: wrap;
-    }
-    .card {
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
-      width: 250px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    .chart-placeholder {
-      margin-top: 25px;
-      background: white;
-      height: 300px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 18px;
-      color: #555;
+    .card:hover{transform:translateY(-3px);box-shadow:0 6px 18px rgba(0,0,0,0.1);}
+    .card-title{font-size:14px;color:var(--text-light);margin-bottom:6px;}
+    .card-value{font-size:32px;font-weight:700;color:var(--primary);}    
+
+    .chart-placeholder{
+      margin-top:30px;background:var(--card);height:320px;border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,0.06);
+      display:flex;justify-content:center;align-items:center;color:var(--text-light);font-size:16px;font-weight:500;
     }
   </style>
 </head>
 <body>
   <div class="sidebar">
-    <h2>SMARTSTOCK</h2>
-    <a href="#">🏠 Dashboard</a>
-    <a href="#">📦 Inventory</a>
-    <a href="#">🏭 Warehouses</a>
-    <a href="#">📊 Reports</a>
-    <a href="#">🔮 Forecasting</a>
-    <a href="#">⚙️ Settings</a>
+    <div class="logo">SMARTSTOCK</div>
+    <a class="nav-link active" href="#">Dashboard</a>
+    <a class="nav-link" href="inventory.html">Inventory</a>
+    <a class="nav-link" href="#">Warehouses</a>
+    <a class="nav-link" href="#">Reports</a>
+    <a class="nav-link" href="#">Forecasting</a>
+    <a class="nav-link" href="#">Settings</a>
   </div>
 
   <div class="main">
     <div class="header">Dashboard Overview</div>
 
     <div class="cards">
-      <div class="card">
-        <b>Total Products</b>
-        <h2>120</h2>
-      </div>
-      <div class="card">
-        <b>Low Stock Items</b>
-        <h2>08</h2>
-      </div>
-      <div class="card">
-        <b>Warehouses</b>
-        <h2>02</h2>
-      </div>
-      <div class="card">
-        <b>Predicted Restocks</b>
-        <h2>05</h2>
-      </div>
+      <div class="card"><div class="card-title">Total Products</div><div class="card-value">120</div></div>
+      <div class="card"><div class="card-title">Low Stock Items</div><div class="card-value">8</div></div>
+      <div class="card"><div class="card-title">Warehouses</div><div class="card-value">2</div></div>
+      <div class="card"><div class="card-title">Predicted Restocks</div><div class="card-value">5</div></div>
     </div>
 
-    <div class="chart-placeholder">
-      📈 Sales & Stock Trend Chart Placeholder
-    </div>
+    <div class="chart-placeholder">Analytics coming soon</div>
   </div>
-
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-<script src="firebase.js"></script>
-<script src="auth.js"></script>
-
-<script>
-auth.onAuthStateChanged(user => {
-  if (!user) window.location.href = "login.html";
-});
-</script>
-
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
 </body>
 </html>

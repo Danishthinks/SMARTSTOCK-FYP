@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Add Product - SMARTSTOCK</title>
+<style>
+  :root{
+    --bg:#f5f7fa;
+    --sidebar:#1f2937;
+    --primary:#2563eb;
+    --text-dark:#111827;
+    --white:#fff;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;font-family:Arial;}
+  body{display:flex;background:var(--bg);}
+  
+  .sidebar{
+    width:230px;background:var(--sidebar);color:#fff;height:100vh;
+    position:fixed;padding:25px 15px;
+  }
+  .logo{font-size:22px;font-weight:bold;margin-bottom:25px;text-align:center;}
+  .nav-link{color:#d1d5db;text-decoration:none;display:block;padding:12px;
+    border-radius:8px;margin-bottom:8px;font-size:15px;}
+  .nav-link:hover{background:rgba(255,255,255,0.12);color:#fff;}
+
+  .main{margin-left:230px;padding:35px;width:100%;}
+  .heading{font-size:22px;font-weight:600;color:var(--text-dark);margin-bottom:20px;}
+
+  .form-box{
+    background:var(--white);padding:25px;border-radius:12px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.08);max-width:450px;
+  }
+
+  .form-group{margin-bottom:15px;}
+  label{font-size:14px;font-weight:600;color:var(--text-dark);}
+  input, select{
+    width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;
+    margin-top:5px;font-size:14px;
+  }
+  button{
+    width:100%;background:var(--primary);color:#fff;padding:12px;
+    border-radius:6px;border:none;font-size:16px;cursor:pointer;
+  }
+  button:hover{opacity:0.9;}
+
+  .msg{margin-top:10px;font-size:14px;}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="logo">SMARTSTOCK</div>
+  <a class="nav-link" href="dashboard.html">Dashboard</a>
+  <a class="nav-link" style="background:rgba(255,255,255,0.12)" href="add-inventory.html">Add Product</a>
+  <a class="nav-link" href="inventory.html">Inventory List</a>
+</div>
+
+<div class="main">
+  <div class="heading">Add New Product</div>
+
+  <div class="form-box">
+    <div class="form-group">
+      <label>Product Name</label>
+      <input id="pname" type="text" placeholder="e.g. iPhone 14" maxlength="100">
+    </div>
+
+    <div class="form-group">
+      <label>Category</label>
+      <input id="pcategory" type="text" placeholder="e.g. Mobile Phones" maxlength="50">
+    </div>
+
+    <div class="form-group">
+      <label>Stock Quantity</label>
+      <input id="pqty" type="number" placeholder="e.g. 10" min="0" step="1">
+    </div>
+
+    <div class="form-group">
+      <label>Purchase Price</label>
+      <input id="pprice" type="number" placeholder="e.g. 20000" min="0" step="0.01">
+    </div>
+
+    <div class="form-group">
+      <label>Selling Price</label>
+      <input id="psell" type="number" placeholder="e.g. 24000" min="0" step="0.01">
+    </div>
+
+    <button onclick="addProduct()" id="addBtn">Add Product</button>
+    <p class="msg" id="msg"></p>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+<script src="firebase.js"></script>
+
+<script>
+// Check authentication
+auth.onAuthStateChanged(user => {
+  if (!user) {
+    window.location.href = "login.html";
+    return;
+  }
+});
+
+function showMessage(text, type = 'error') {
+  const msg = document.getElementById('msg');
+  msg.innerHTML = text;
+  msg.style.color = type === 'success' ? '#0a7b00' : type === 'warning' ? '#9B870C' : '#b00020';
+}
+
+function addProduct() {
+  // Get form elements
+  const name = document.getElementById('pname').value.trim();
+  const cat = document.getElementById('pcategory').value.trim();
+  const qty = document.getElementById('pqty').value;
+  const price = document.getElementById('pprice').value;
+  const sell = document.getElementById('psell').value;
+  const addBtn = document.getElementById('addBtn');
+
+  // Validate inputs
+  if (!name || !cat || !qty || !price || !sell) {
+    showMessage('⚠️ Please fill all fields', 'warning');
+    return;
+  }
+
+  // Convert to numbers for validation
+  const qtyNum = Number(qty);
+  const priceNum = Number(price);
+  const sellNum = Number(sell);
+
+  // Additional validations
+  if (qtyNum < 0 || !Number.isInteger(qtyNum)) {
+    showMessage('⚠️ Quantity must be a positive whole number', 'warning');
+    return;
+  }
+  if (priceNum <= 0) {
+    showMessage('⚠️ Purchase price must be greater than 0', 'warning');
+    return;
+  }
+  if (sellNum <= 0) {
+    showMessage('⚠️ Selling price must be greater than 0', 'warning');
+    return;
+  }
+  if (sellNum <= priceNum) {
+    showMessage('⚠️ Selling price should be higher than purchase price', 'warning');
+    return;
+  }
+
+  // Check if Firestore is available
+  if (!window.db) {
+    showMessage('❌ Database not initialized. Please refresh the page.', 'error');
+    return;
+  }
+
+  // Disable button and show loading state
+  addBtn.disabled = true;
+  addBtn.textContent = 'Adding Product...';
+  showMessage('Adding product...', 'warning');
+
+  // Add to Firestore with user reference
+  db.collection("products").add({
+    name: name,
+    category: cat,
+    quantity: qtyNum,
+    purchasePrice: priceNum,
+    sellingPrice: sellNum,
+    createdAt: new Date(),
+    createdBy: auth.currentUser.uid
+  }).then(() => {
+    showMessage('✅ Product Added Successfully', 'success');
+    // Reset form
+    document.getElementById('pname').value = '';
+    document.getElementById('pcategory').value = '';
+    document.getElementById('pqty').value = '';
+    document.getElementById('pprice').value = '';
+    document.getElementById('psell').value = '';
+  }).catch(err => {
+    console.error('Error adding product:', err);
+    showMessage('❌ Error: ' + (err.message || 'Failed to add product'), 'error');
+  }).finally(() => {
+    // Reset button state
+    addBtn.disabled = false;
+    addBtn.textContent = 'Add Product';
+  });
+}
+</script>
+
+</body>
+</html>
