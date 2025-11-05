@@ -43,32 +43,219 @@
       margin-top:30px;background:var(--card);height:320px;border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,0.06);
       display:flex;justify-content:center;align-items:center;color:var(--text-light);font-size:16px;font-weight:500;
     }
+    
+    /* Loading and error states */
+    .loading {
+      opacity: 0.7;
+      position: relative;
+    }
+    .loading .card-value::after {
+      content: "Loading...";
+      font-size: 14px;
+      color: var(--text-light);
+      position: absolute;
+      bottom: -20px;
+      left: 20px;
+    }
+    .error {
+      border: 1px solid #fee2e2;
+    }
+    .error .card-value {
+      color: #b00020;
+      font-size: 16px;
+    }
+    
+    /* User info */
+    .user-info {
+      margin-top: auto;
+      padding: 15px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      font-size: 14px;
+      color: #d1d5db;
+    }
+    .logout-btn {
+      background: none;
+      border: none;
+      color: #d1d5db;
+      padding: 5px 0;
+      margin-top: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      text-align: left;
+      width: 100%;
+    }
+    .logout-btn:hover {
+      color: #fff;
+    }
   </style>
 </head>
 <body>
   <div class="sidebar">
     <div class="logo">SMARTSTOCK</div>
-    <a class="nav-link active" href="#">Dashboard</a>
-    <a class="nav-link" href="inventory.html">Inventory</a>
-    <a class="nav-link" href="#">Warehouses</a>
-    <a class="nav-link" href="#">Reports</a>
-    <a class="nav-link" href="#">Forecasting</a>
-    <a class="nav-link" href="#">Settings</a>
+    <a class="nav-link active" href="index.html">Dashboard</a>
+    <a class="nav-link" href="add-inventory.html">Add Product</a>
+    <a class="nav-link" href="inventory.html">Inventory List</a>
+    <a class="nav-link" href="logs.html">Activity Logs</a>
+    
+    <!-- User info and logout -->
+    <div class="user-info">
+      <div id="userEmail">Loading...</div>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
   </div>
 
   <div class="main">
     <div class="header">Dashboard Overview</div>
 
     <div class="cards">
-      <div class="card"><div class="card-title">Total Products</div><div class="card-value">120</div></div>
-      <div class="card"><div class="card-title">Low Stock Items</div><div class="card-value">8</div></div>
-      <div class="card"><div class="card-title">Warehouses</div><div class="card-value">2</div></div>
-      <div class="card"><div class="card-title">Predicted Restocks</div><div class="card-value">5</div></div>
-    </div>
+      <!-- Total Products -->
+      <div class="card loading" id="totalProductsCard">
+        <div class="card-title">Total Products</div>
+        <div class="card-value" id="totalProducts">0</div>
+      </div>
 
-    <div class="chart-placeholder">Analytics coming soon</div>
+      <!-- Low Stock -->
+      <div class="card loading" id="lowStockCard">
+        <div class="card-title">Low Stock Items</div>
+        <div class="card-value" id="lowStock">0</div>
+      </div>
+
+      <!-- Warehouses -->
+      <div class="card">
+        <div class="card-title">Warehouses</div>
+        <div class="card-value">2</div>
+      </div>
+
+      <!-- Predicted Restocks -->
+      <div class="card">
+        <div class="card-title">Predicted Restocks</div>
+        <div class="card-value">5</div>
+      </div>
+    </div>
+    <div class="chart-placeholder">Analytics dashboard coming soon</div>
   </div>
+
+<div class="log-widget" style="
+  background:white; 
+  margin-top:25px; 
+  padding:20px; 
+  border-radius:12px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.1);
+">
+  <h3 style="margin-bottom:15px; font-size:18px;">Recent Activity</h3>
+  <ul id="recentLogs" style="list-style:none; padding:0; font-size:14px; color:#333;"></ul>
+</div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="firebase.js"></script>
+  <script src="firebase-logs.js"></script>
+
+  <script>
+  // Auth guard
+  if (typeof auth !== 'undefined') {
+    auth.onAuthStateChanged(user => {
+      if (!user) {
+        window.location.href = 'login.html';
+        return;
+      }
+      // Show user email
+      document.getElementById('userEmail').textContent = user.email;
+    });
+  } else {
+    console.error('Auth not initialized');
+    window.location.href = 'login.html';
+  }
+
+  // Logout function
+  function logout() {
+    if (typeof auth !== 'undefined') {
+      auth.signOut()
+        .then(() => window.location.href = 'login.html')
+        .catch(err => console.error('Logout error:', err));
+    }
+  }
+
+  // Dashboard stats
+  function updateStats() {
+    const totalProductsCard = document.getElementById('totalProductsCard');
+    const lowStockCard = document.getElementById('lowStockCard');
+    const totalProducts = document.getElementById('totalProducts');
+    const lowStock = document.getElementById('lowStock');
+
+    if (!window.db) {
+      console.error('Database not initialized');
+      totalProductsCard.classList.add('error');
+      lowStockCard.classList.add('error');
+      totalProducts.innerText = 'Error loading data';
+      lowStock.innerText = 'Error loading data';
+      return;
+    }
+
+    try {
+      db.collection('products').onSnapshot(snapshot => {
+        // Remove loading state
+        totalProductsCard.classList.remove('loading', 'error');
+        lowStockCard.classList.remove('loading', 'error');
+
+        // Update total products
+        totalProducts.innerText = snapshot.size;
+
+        // Count low stock items
+        let lowCount = 0;
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data && data.quantity != null && data.quantity < 5) lowCount++;
+        });
+        lowStock.innerText = lowCount;
+      }, error => {
+        console.error('Snapshot error:', error);
+        totalProductsCard.classList.add('error');
+        lowStockCard.classList.add('error');
+        totalProducts.innerText = 'Error';
+        lowStock.innerText = 'Error';
+      });
+    } catch (e) {
+      console.error('Stats error:', e);
+      totalProductsCard.classList.add('error');
+      lowStockCard.classList.add('error');
+      totalProducts.innerText = 'Error';
+      lowStock.innerText = 'Error';
+    }
+  }
+
+  // Initialize dashboard
+  updateStats();
+</script>
+
+<script>
+// Recent Activity Logs on Dashboard
+db.collection("logs")
+  .orderBy("timestamp", "desc")
+  .limit(5)
+  .onSnapshot(snapshot => {
+    const logList = document.getElementById("recentLogs");
+    logList.innerHTML = ""; 
+
+    snapshot.forEach(doc => {
+      const log = doc.data();
+      const time = log.timestamp ? log.timestamp.toDate().toLocaleTimeString() : "--";
+
+      const li = document.createElement("li");
+      li.style.marginBottom = "8px";
+      li.innerHTML = `
+        <strong>${log.action}</strong> - ${log.productName} 
+        (${log.quantity}) 
+        <br>
+        <small>${log.user} • ${time}</small>
+      `;
+      logList.appendChild(li);
+    });
+});
+</script>
+
 
 </body>
 </html>

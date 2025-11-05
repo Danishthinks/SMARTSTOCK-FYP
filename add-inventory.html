@@ -51,9 +51,10 @@
 
 <div class="sidebar">
   <div class="logo">SMARTSTOCK</div>
-  <a class="nav-link" href="dashboard.html">Dashboard</a>
+  <a class="nav-link" href="index.html">Dashboard</a>
   <a class="nav-link" style="background:rgba(255,255,255,0.12)" href="add-inventory.html">Add Product</a>
   <a class="nav-link" href="inventory.html">Inventory List</a>
+  <a class="nav-link" href="logs.html">Activity Logs</a>
 </div>
 
 <div class="main">
@@ -95,6 +96,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
 <script src="firebase.js"></script>
+<script src="firebase-logs.js"></script>
 
 <script>
 // Check authentication
@@ -170,6 +172,9 @@ function addProduct() {
     createdAt: new Date(),
     createdBy: auth.currentUser.uid
   }).then(() => {
+    // Log the action first
+    addLog("ADD PRODUCT", name, qtyNum);
+    
     showMessage('✅ Product Added Successfully', 'success');
     // Reset form
     document.getElementById('pname').value = '';

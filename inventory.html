@@ -13,113 +13,384 @@
   --text-dark:#111827;
 }
 *{margin:0;padding:0;box-sizing:border-box;font-family:Arial;}
-body{display:flex;background:var(--bg);}
+body{display:flex;background:var(--bg);} 
 
-/* sidebar */
-.sidebar{width:230px;background:var(--sidebar);color:#fff;height:100vh;position:fixed;padding:25px;}
-.logo{font-size:22px;font-weight:600;margin-bottom:25px;text-align:center;}
-.nav-link{
-  color:#d1d5db;text-decoration:none;display:block;padding:12px;border-radius:8px;margin-bottom:8px;font-size:15px;
+/* Sidebar */
+.sidebar{
+  width:230px;
+  background:var(--sidebar);
+  color:#fff;
+  height:100vh;
+  position:fixed;
+  padding:25px;
+  display:flex;
+  flex-direction:column;
 }
+.logo{font-size:22px;font-weight:600;margin-bottom:25px;text-align:center;}
+.nav-link{color:#d1d5db;text-decoration:none;display:block;padding:12px;border-radius:8px;margin-bottom:8px;font-size:15px;}
 .nav-link:hover, .active{background:rgba(255,255,255,0.12);color:#fff;}
 
-/* main */
-.main{margin-left:230px;padding:35px;width:100%;}
-.heading{font-size:22px;font-weight:bold;margin-bottom:20px;color:var(--text-dark);}
+/* User section */
+.user-info {
+  margin-top: auto;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  font-size: 14px;
+  color: #d1d5db;
+}
+.logout-btn {
+  background: none;
+  border: none;
+  color: #d1d5db;
+  padding: 5px 0;
+  margin-top: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  width: 100%;
+  text-align: left;
+}
+.logout-btn:hover { color: #fff; }
 
-/* Table */
-table{
-  width:100%;
-  border-collapse:collapse;
-  background:white;
-  box-shadow:0 4px 10px rgba(0,0,0,0.08);
-}
-th,td{
-  padding:12px;
-  border-bottom:1px solid #e5e7eb;
-  text-align:left;
-  font-size:14px;
-}
-th{background:#eef2ff;font-weight:bold;color:#111;}
-.action-btn{
-  cursor:pointer;
-  padding:6px 10px;
-  border-radius:6px;
-  font-size:13px;
-  border:none;
-  margin-right:5px;
-}
+/* Main content */
+.main{margin-left:230px;padding:35px;width:100%;}
+.heading{font-size:22px;font-weight:bold;margin-bottom:20px;color:var(--text-dark);} 
+table{width:100%;border-collapse:collapse;background:white;box-shadow:0 4px 10px rgba(0,0,0,0.08);} 
+th,td{padding:12px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:14px;}
+th{background:#eef2ff;font-weight:bold;color:#111;} 
+.low-stock td { color: #b00020; }
+.badge {background:#dc2626;color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;margin-left:5px;} 
+.loading-row td{padding:20px;text-align:center;color:#666;} 
+.action-btn{cursor:pointer;padding:6px 10px;border-radius:6px;font-size:13px;border:none;margin-right:5px;}
 .edit{background:#facc15;color:#000;}
 .delete{background:#ef4444;color:#fff;}
 </style>
 </head>
 <body>
-
-<!-- Sidebar -->
 <div class="sidebar">
   <div class="logo">SMARTSTOCK</div>
   <a class="nav-link" href="index.html">Dashboard</a>
   <a class="nav-link" href="add-inventory.html">Add Product</a>
   <a class="nav-link active" href="inventory.html">Inventory List</a>
+  <a class="nav-link" href="logs.html">Activity Logs</a>
+  
+  <!-- User info and logout -->
+  <div class="user-info">
+    <div id="userEmail">Loading...</div>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
 </div>
-
-<!-- Main Content -->
 <div class="main">
-  <div class="heading">Inventory List</div>
+  <div class="heading" style="display:flex; justify-content:space-between; align-items:center;">
+    <span>Inventory List</span>
+    <div style="display:flex; gap:10px;">
+      <input id="searchInput" placeholder="Search product..." style="padding:8px;border:1px solid #ccc;border-radius:6px;width:200px;" onkeyup="filterProducts()">
+      <select id="categoryFilter" style="padding:8px;border:1px solid #ccc;border-radius:6px;" onchange="filterProducts()">
+        <option value="">All Categories</option>
+      </select>
+      <button onclick="exportInventoryExcel()" 
+style="padding:8px 12px; background:#2563eb; color:white; border:none; border-radius:6px; cursor:pointer;">
+  Export Excel
+</button>
 
+    </div>
+  </div>
   <table>
     <thead>
       <tr>
-        <th>Name</th>
-        <th>Category</th>
-        <th>Qty</th>
-        <th>Buy Price</th>
-        <th>Sell Price</th>
-        <th>Actions</th>
+        <th>Name</th><th>Category</th><th>Qty</th><th>Buy Price</th><th>Sell Price</th><th>Actions</th>
       </tr>
     </thead>
-    
     <tbody id="productTable"></tbody>
   </table>
 </div>
-
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 <script src="firebase.js"></script>
+<script src="firebase-logs.js"></script>
 
 <script>
-// ✅ Real-time Display
-db.collection("products").orderBy("createdAt","desc").onSnapshot(snapshot=>{
-  let table = "";
-  snapshot.forEach(doc=>{
-    const p = doc.data();
-    table += `
-      <tr>
-        <td>${p.name}</td>
-        <td>${p.category}</td>
-        <td>${p.quantity}</td>
-        <td>${p.purchasePrice}</td>
-        <td>${p.sellingPrice}</td>
-        <td>
-          <button class="action-btn edit" onclick="editProduct('${doc.id}')">Edit</button>
-          <button class="action-btn delete" onclick="deleteProduct('${doc.id}')">Delete</button>
-        </td>
-      </tr>
-    `;
+// Add auth guard and initialize products when document is ready
+document.addEventListener('DOMContentLoaded', function() {
+  // Check auth first
+  if (typeof auth === 'undefined') {
+    console.error('Auth not initialized');
+    window.location.href = 'login.html';
+    return;
+  }
+
+  auth.onAuthStateChanged(user => {
+    if (!user) {
+      window.location.href = 'login.html';
+      return;
+    }
+    // Show user email
+    const userEmail = document.getElementById('userEmail');
+    if (userEmail) userEmail.textContent = user.email;
+    // Initialize products after auth
+    initializeProducts();
   });
-  document.getElementById("productTable").innerHTML = table;
 });
 
-// 🗑 Delete Product (function empty for now)
-function deleteProduct(id){
-  alert("Delete function will be added next ✅");
+// Logout function
+function logout() {
+  if (typeof auth !== 'undefined') {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Logging out...';
+    
+    auth.signOut()
+      .then(() => window.location.href = 'login.html')
+      .catch(err => {
+        console.error('Logout error:', err);
+        btn.disabled = false;
+        btn.textContent = 'Logout';
+        alert('Error logging out: ' + err.message);
+      });
+  }
 }
 
-// ✏ Edit Product (function empty for now)
-function editProduct(id){
-  alert("Edit form coming next ✅");
+// Store products for filtering
+let productsData = [];
+const tableEl = document.getElementById('productTable');
+
+// Helper functions
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, m => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[m]);
+}
+
+function showLoading() {
+  if (tableEl) {
+    tableEl.innerHTML = '<tr class="loading-row"><td colspan="6">Loading products...</td></tr>';
+  }
+}
+
+function showError(message) {
+  if (tableEl) {
+    tableEl.innerHTML = `<tr><td colspan="6" style="color:#b00020">Error: ${escapeHtml(message)}</td></tr>`;
+  }
+  console.error(message);
+}
+
+// Initialize products after checking auth and db
+function initializeProducts() {
+  if (!tableEl) {
+    console.error('Product table element not found');
+    return;
+  }
+
+  showLoading();
+
+  if (!window.db) {
+    showError('Database not initialized. Please refresh the page.');
+    return;
+  }
+
+  // Verify auth before loading data
+  if (!auth.currentUser) {
+    showError('Please log in to view products');
+    setTimeout(() => window.location.href = 'login.html', 1000);
+    return;
+  }
+
+  // Initialize Firestore listener
+  try {
+    db.collection("products")
+      .orderBy("createdAt", "desc")
+      .onSnapshot(snapshot => {
+        productsData = [];
+        let categories = new Set();
+        
+        // Process snapshot data
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data) {
+            productsData.push({ ...data, id: doc.id });
+            if (data.category) categories.add(data.category);
+          }
+        });
+
+        // Update category filter
+        const catSelect = document.getElementById("categoryFilter");
+        if (catSelect) {
+          catSelect.innerHTML = '<option value="">All Categories</option>';
+          Array.from(categories).sort().forEach(category => {
+            catSelect.innerHTML += `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`;
+          });
+        }
+
+        // Render the table
+        if (productsData.length === 0) {
+          tableEl.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#666">No products found</td></tr>';
+        } else {
+          renderTable(productsData);
+        }
+      }, error => {
+        showError(error.message || 'Error loading products');
+      });
+  } catch (error) {
+    showError('Failed to initialize product listener: ' + error.message);
+  }
+}
+
+function renderTable(data) {
+  if (!tableEl) return;
+  
+  let html = "";
+  data.forEach(p => {
+    // Safely access properties with defaults
+    const quantity = p.quantity != null ? p.quantity : 0;
+    const low = quantity < 5;
+    const name = p.name || '';
+    const category = p.category || '';
+    const purchasePrice = p.purchasePrice != null ? p.purchasePrice : 0;
+    const sellingPrice = p.sellingPrice != null ? p.sellingPrice : 0;
+
+    html += `
+      <tr class="${low ? 'low-stock' : ''}">
+        <td>${escapeHtml(name)}</td>
+        <td>${escapeHtml(category)}</td>
+        <td>${quantity}${low ? '<span class="badge">Low</span>' : ''}</td>
+        <td>Rs. ${purchasePrice.toLocaleString()}</td>
+        <td>Rs. ${sellingPrice.toLocaleString()}</td>
+        <td>
+          <button class="action-btn edit" onclick="editProduct('${escapeHtml(p.id)}')">Edit</button>
+          <button class="action-btn edit" onclick="adjustStock('${escapeHtml(p.id)}')">Adjust</button>
+          <button class="action-btn delete" onclick="deleteProduct('${escapeHtml(p.id)}')">Delete</button>
+        </td>
+      </tr>`;
+  });
+  
+  tableEl.innerHTML = html;
+}
+
+function filterProducts() {
+  const search = document.getElementById('searchInput').value.toLowerCase().trim();
+  const cat = document.getElementById('categoryFilter').value;
+  
+  // Handle empty data
+  if (!productsData.length) {
+    tableEl.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#666">No products found</td></tr>';
+    return;
+  }
+
+  const filtered = productsData.filter(p => {
+    const nameMatch = p.name?.toLowerCase().includes(search);
+    const catMatch = !cat || p.category === cat;
+    return nameMatch && catMatch;
+  });
+
+  if (filtered.length === 0) {
+    tableEl.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#666">No matching products found</td></tr>';
+    return;
+  }
+
+  renderTable(filtered);
+}
+
+function deleteProduct(id) {
+  if (!window.db) { 
+    alert('Database not ready. Please refresh the page.');
+    return;
+  }
+
+  if (!confirm('Are you sure you want to delete this product?')) return;
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Deleting...';
+
+  // Get the product data first for the log
+  db.collection('products').doc(id).get()
+    .then(doc => {
+      if (doc.exists) {
+        const product = doc.data();
+        // Delete the product
+        return db.collection('products').doc(id).delete()
+          .then(() => {
+            // Log after successful deletion
+            addLog("DELETE PRODUCT", product.name || '', product.quantity || 0);
+            console.log('Product deleted successfully');
+            // Table will update automatically via snapshot
+          });
+      }
+    })
+    .catch(err => {
+      console.error('Delete error:', err);
+      alert('Error deleting product: ' + (err.message || err));
+      btn.disabled = false;
+      btn.textContent = 'Delete';
+    });
+}
+
+function editProduct(id) {
+  window.location.href = `inventory-edit.html?id=${encodeURIComponent(id)}`;
+}
+
+function adjustStock(id) {
+  window.location.href = `inventory-adjust.html?id=${encodeURIComponent(id)}`;
+}
+
+</script>
+
+<!-- Export inventory to CSV (works with Excel). Uses current filters. -->
+<script>
+function escapeCsv(value) {
+  if (value == null) return '';
+  const s = String(value);
+  // Double quotes escape
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+function getFilteredProducts() {
+  const search = document.getElementById('searchInput')?.value.toLowerCase().trim() || '';
+  const cat = document.getElementById('categoryFilter')?.value || '';
+  if (!productsData || !productsData.length) return [];
+  return productsData.filter(p => {
+    const nameMatch = p.name?.toLowerCase().includes(search);
+    const catMatch = !cat || p.category === cat;
+    return nameMatch && catMatch;
+  });
+}
+
+function exportInventoryExcel() {
+  const rows = getFilteredProducts();
+  if (!rows.length) {
+    alert('No products to export');
+    return;
+  }
+
+  const headers = ['Name', 'Category', 'Quantity', 'Purchase Price', 'Selling Price'];
+  let csv = headers.join(',') + '\n';
+
+  rows.forEach(p => {
+    const line = [
+      escapeCsv(p.name || ''),
+      escapeCsv(p.category || ''),
+      escapeCsv(p.quantity ?? ''),
+      escapeCsv(p.purchasePrice ?? ''),
+      escapeCsv(p.sellingPrice ?? '')
+    ].join(',');
+    csv += line + '\n';
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  const date = new Date().toISOString().slice(0,10);
+  link.download = `Inventory_Report_${date}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }
 </script>
 

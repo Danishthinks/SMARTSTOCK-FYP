@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activity Logs - SMARTSTOCK</title>
+<style>
+:root{
+  --bg:#f5f7fa;
+  --sidebar:#1f2937;
+  --primary:#2563eb;
+  --white:#fff;
+  --text-dark:#111827;
+}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial;}
+body{display:flex;background:var(--bg);} 
+.sidebar{
+  width:230px;
+  background:var(--sidebar);
+  color:#fff;
+  height:100vh;
+  position:fixed;
+  padding:25px;
+  display:flex;
+  flex-direction:column;
+}
+
+/* User info styles */
+.user-info {
+  margin-top: auto;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  font-size: 14px;
+  color: #d1d5db;
+}
+
+.logout-btn {
+  background: none;
+  border: none;
+  color: #d1d5db;
+  padding: 5px 0;
+  margin-top: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  width: 100%;
+  text-align: left;
+}
+
+.logout-btn:hover { color: #fff; }
+
+.error-row td {
+  padding: 20px;
+  text-align: center;
+  color: #b00020;
+}
+.logo{font-size:22px;font-weight:600;margin-bottom:25px;text-align:center;}
+.nav-link{color:#d1d5db;text-decoration:none;display:block;padding:12px;border-radius:8px;margin-bottom:8px;font-size:15px;}
+.nav-link:hover, .active{background:rgba(255,255,255,0.12);color:#fff;}
+.main{margin-left:230px;padding:35px;width:100%;}
+.heading{font-size:22px;font-weight:bold;margin-bottom:20px;color:var(--text-dark);} 
+table{width:100%;border-collapse:collapse;background:white;box-shadow:0 4px 10px rgba(0,0,0,0.08);} 
+th,td{padding:12px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:14px;}
+th{background:#eef2ff;font-weight:bold;color:#111;} 
+.loading-row td{padding:20px;text-align:center;color:#666;} 
+.filter-box{display:flex;gap:10px;margin-bottom:20px;}
+.filter-box select{padding:8px;border:1px solid #ccc;border-radius:6px;}
+</style>
+</head>
+<body>
+<div class="sidebar">
+  <div class="logo">SMARTSTOCK</div>
+  <a class="nav-link" href="index.html">Dashboard</a>
+  <a class="nav-link" href="add-inventory.html">Add Product</a>
+  <a class="nav-link" href="inventory.html">Inventory List</a>
+  <a class="nav-link active" href="logs.html">Activity Logs</a>
+  
+  <!-- User info and logout -->
+  <div class="user-info">
+    <div id="userEmail">Loading...</div>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
+</div>
+<div class="main">
+  <div class="heading">Activity Logs</div>
+  <div class="filter-box">
+    <select id="userFilter" onchange="applyFilter()">
+      <option value="">All Users</option>
+    </select>
+    <select id="actionFilter" onchange="applyFilter()">
+      <option value="">All Actions</option>
+      <option value="ADD PRODUCT">ADD PRODUCT</option>
+      <option value="DELETE PRODUCT">DELETE PRODUCT</option>
+      <option value="STOCK ADJUST">STOCK ADJUST</option>
+      <option value="UPDATE PRODUCT">UPDATE PRODUCT</option>
+    </select>
+    <button onclick="exportLogsExcel()" style="padding:8px 12px; background:#2563eb; color:white; border:none; border-radius:6px; cursor:pointer;">Export Logs Excel</button>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th><th>User</th><th>Action</th><th>Product</th><th>Quantity</th>
+      </tr>
+    </thead>
+    <tbody id="logsTable"></tbody>
+  </table>
+</div>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
+<script>
+// Store logs for filtering
+let logsData = [];
+
+// Logout function
+function logout() {
+  if (typeof auth !== 'undefined') {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Logging out...';
+    
+    auth.signOut()
+      .then(() => window.location.href = 'login.html')
+      .catch(err => {
+        console.error('Logout error:', err);
+        btn.disabled = false;
+        btn.textContent = 'Logout';
+        alert('Error logging out: ' + err.message);
+      });
+  }
+}
+// Auth guard
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof auth === 'undefined') {
+    console.error('Auth not initialized');
+    window.location.href = 'login.html';
+    return;
+  }
+
+  auth.onAuthStateChanged(user => {
+    if (!user) {
+      window.location.href = 'login.html';
+      return;
+    }
+    initializeLogs();
+  });
+});
+
+function initializeLogs() {
+  const tableEl = document.getElementById('logsTable');
+  if (!tableEl) return;
+  
+  tableEl.innerHTML = '<tr class="loading-row"><td colspan="5">Loading logs...</td></tr>';
+  
+  if (!window.db) {
+    tableEl.innerHTML = '<tr class="error-row"><td colspan="5">Error: Database not initialized</td></tr>';
+    return;
+  }
+
+  try {
+    db.collection("logs")
+      .orderBy("timestamp", "desc")
+      .limit(100) // Limit for performance
+      .onSnapshot(snap => {
+        logsData = [];
+        let users = new Set();
+        
+        snap.forEach(doc => {
+          const d = doc.data();
+          if (d) {
+            logsData.push(d);
+            if (d.user) users.add(d.user);
+          }
+        });
+
+        const userSelect = document.getElementById("userFilter");
+        if (userSelect) {
+          userSelect.innerHTML = '<option value="">All Users</option>' +
+            Array.from(users).map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+        }
+
+        renderLogs(logsData);
+      }, error => {
+        console.error('Error loading logs:', error);
+        tableEl.innerHTML = `<tr class="error-row"><td colspan="5">Error loading logs: ${escapeHtml(error.message)}</td></tr>`;
+      });
+  } catch (error) {
+    console.error('Failed to initialize logs:', error);
+    tableEl.innerHTML = `<tr class="error-row"><td colspan="5">Failed to load logs: ${escapeHtml(error.message)}</td></tr>`;
+  }
+}
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, m => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[m]);
+}
+
+function renderLogs(data) {
+  const tableEl = document.getElementById('logsTable');
+  if (!tableEl) return;
+
+  if (!data || data.length === 0) {
+    tableEl.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#666;">No logs found</td></tr>';
+    return;
+  }
+
+  let html = "";
+  data.forEach(l => {
+    const time = l.timestamp ? l.timestamp.toDate().toLocaleString() : "--";
+    html += `<tr>
+        <td>${escapeHtml(time)}</td>
+        <td>${escapeHtml(l.user || '')}</td>
+        <td>${escapeHtml(l.action || '')}</td>
+        <td>${escapeHtml(l.productName || '')}</td>
+        <td>${escapeHtml(String(l.quantity || 0))}</td>
+      </tr>`;
+  });
+  tableEl.innerHTML = html;
+}
+
+function applyFilter() {
+  const user = document.getElementById('userFilter').value;
+  const action = document.getElementById('actionFilter').value;
+  
+  const filtered = logsData.filter(l => {
+    const matchUser = (user === '' || l.user === user);
+    const matchAction = (action === '' || l.action === action);
+    return matchUser && matchAction;
+  });
+  
+  renderLogs(filtered);
+}
+</script>
+
+<!-- Export logs to CSV (Excel-friendly), uses current filters -->
+<script>
+function escapeCsv(value) {
+  if (value == null) return '';
+  const s = String(value);
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+function getFilteredLogs() {
+  const user = document.getElementById('userFilter')?.value || '';
+  const action = document.getElementById('actionFilter')?.value || '';
+  if (!logsData || !logsData.length) return [];
+  return logsData.filter(l => {
+    const matchUser = (user === '' || l.user === user);
+    const matchAction = (action === '' || l.action === action);
+    return matchUser && matchAction;
+  });
+}
+
+function exportLogsExcel() {
+  const rows = getFilteredLogs();
+  if (!rows.length) {
+    alert('No logs to export');
+    return;
+  }
+
+  const headers = ['Time','User','Action','Product','Quantity'];
+  let csv = headers.join(',') + '\n';
+
+  rows.forEach(l => {
+    const time = l.timestamp ? l.timestamp.toDate().toLocaleString() : '';
+    const line = [
+      escapeCsv(time),
+      escapeCsv(l.user || ''),
+      escapeCsv(l.action || ''),
+      escapeCsv(l.productName || ''),
+      escapeCsv(l.quantity ?? '')
+    ].join(',');
+    csv += line + '\n';
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  const date = new Date().toISOString().slice(0,10);
+  link.download = `Logs_Report_${date}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+</script>
+
+</body>
+</html>

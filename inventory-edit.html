@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Edit Product - SMARTSTOCK</title>
+<style>
+:root{
+  --bg:#f5f7fa;
+  --sidebar:#1f2937;
+  --primary:#2563eb;
+  --white:#fff;
+  --text-dark:#111827;
+}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial;}
+body{display:flex;background:var(--bg);}
+
+/* sidebar */
+.sidebar{width:230px;background:var(--sidebar);color:#fff;height:100vh;position:fixed;padding:25px;}
+.logo{font-size:22px;font-weight:bold;margin-bottom:25px;text-align:center;}
+.nav-link{color:#d1d5db;text-decoration:none;display:block;padding:12px;border-radius:8px;margin-bottom:8px;font-size:15px;}
+.nav-link:hover{background:rgba(255,255,255,0.12);color:#fff;}
+
+/* main */
+.main{margin-left:230px;padding:35px;width:100%;}
+.heading{font-size:22px;font-weight:600;color:var(--text-dark);margin-bottom:20px;}
+
+/* form */
+.form-box{
+  background:var(--white);
+  padding:25px;
+  border-radius:12px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.08);
+  max-width:450px;
+}
+.form-group{margin-bottom:15px;}
+label{font-size:14px;font-weight:600;color:var(--text-dark);}
+input{
+  width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;margin-top:5px;font-size:14px;
+}
+button{
+  width:100%;background:var(--primary);color:#fff;padding:12px;
+  border-radius:6px;border:none;font-size:16px;cursor:pointer;
+}
+.msg{margin-top:10px;font-size:14px;}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="logo">SMARTSTOCK</div>
+  <a class="nav-link" href="index.html">Dashboard</a>
+  <a class="nav-link" href="add-inventory.html">Add Product</a>
+  <a class="nav-link" href="inventory.html">Inventory List</a>
+  <a class="nav-link" href="logs.html">Activity Logs</a>
+</div>
+
+<div class="main">
+  <div class="heading">Edit Product</div>
+
+  <div class="form-box">
+    <div class="form-group"><label>Product Name</label><input id="pname"></div>
+    <div class="form-group"><label>Category</label><input id="pcategory"></div>
+    <div class="form-group"><label>Quantity</label><input id="pqty" type="number"></div>
+    <div class="form-group"><label>Purchase Price</label><input id="pprice" type="number"></div>
+    <div class="form-group"><label>Selling Price</label><input id="psell" type="number"></div>
+
+    <button onclick="updateProduct()">Update Product</button>
+    <p id="msg"></p>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
+<script src="firebase-logs.js"></script>
+
+<script>
+// Helper: show inline messages
+function showMsg(text, type = 'error'){
+  const el = document.getElementById('msg');
+  el.textContent = text;
+  el.style.color = type === 'success' ? '#0a7b00' : (type === 'warning' ? '#9B870C' : '#b00020');
+}
+
+// Get product ID from URL
+const urlParams = new URLSearchParams(window.location.search);
+const productID = urlParams.get('id');
+const updateBtn = document.querySelector('.form-box button');
+
+// Auth guard
+if (typeof auth !== 'undefined') {
+  auth.onAuthStateChanged(user => {
+    if (!user) window.location.href = 'login.html';
+  });
+} else {
+  console.warn('Auth not available on edit page');
+}
+
+if (!productID) {
+  showMsg('❌ No product ID specified in the URL.', 'error');
+} else if (!window.db) {
+  showMsg('❌ Database not initialized. Refresh the page.', 'error');
+} else {
+  // Load product
+  db.collection('products').doc(productID).get().then(doc => {
+    if (!doc.exists) {
+      showMsg('❌ Product not found.', 'error');
+      return;
+    }
+    const p = doc.data();
+    document.getElementById('pname').value = p.name || '';
+    document.getElementById('pcategory').value = p.category || '';
+    document.getElementById('pqty').value = p.quantity != null ? p.quantity : '';
+    document.getElementById('pprice').value = p.purchasePrice != null ? p.purchasePrice : '';
+    document.getElementById('psell').value = p.sellingPrice != null ? p.sellingPrice : '';
+  }).catch(err => {
+    console.error('Error loading product:', err);
+    showMsg('❌ Error loading product: ' + (err.message || err), 'error');
+  });
+}
+
+function validateInputs(name, category, qtyNum, priceNum, sellNum){
+  if (!name) return 'Please enter product name';
+  if (!category) return 'Please enter category';
+  if (!Number.isInteger(qtyNum) || qtyNum < 0) return 'Quantity must be a non-negative whole number';
+  if (priceNum <= 0) return 'Purchase price must be greater than 0';
+  if (sellNum <= 0) return 'Selling price must be greater than 0';
+  if (sellNum <= priceNum) return 'Selling price should be higher than purchase price';
+  return null;
+}
+
+function updateProduct(){
+  if (!productID) { showMsg('❌ Missing product ID', 'error'); return; }
+  if (!window.db) { showMsg('❌ Database not ready', 'error'); return; }
+
+  const name = document.getElementById('pname').value.trim();
+  const category = document.getElementById('pcategory').value.trim();
+  const qty = document.getElementById('pqty').value;
+  const price = document.getElementById('pprice').value;
+  const sell = document.getElementById('psell').value;
+
+  const qtyNum = Number(qty);
+  const priceNum = Number(price);
+  const sellNum = Number(sell);
+
+  const validationError = validateInputs(name, category, qtyNum, priceNum, sellNum);
+  if (validationError) { showMsg('⚠️ ' + validationError, 'warning'); return; }
+
+  // Disable button
+  if (updateBtn) { updateBtn.disabled = true; updateBtn.textContent = 'Updating...'; }
+  showMsg('Updating product...', 'warning');
+
+  db.collection('products').doc(productID).update({
+    name: name,
+    category: category,
+    quantity: qtyNum,
+    purchasePrice: priceNum,
+    sellingPrice: sellNum,
+    updatedAt: new Date()
+  }).then(()=>{
+    // Add log for the update
+    addLog("UPDATE PRODUCT", name, qtyNum);
+    
+    showMsg('✅ Updated Successfully!', 'success');
+    setTimeout(()=> window.location.href = 'inventory.html', 900);
+  }).catch(err=>{
+    console.error('Update error:', err);
+    showMsg('❌ Error updating product: ' + (err.message || err), 'error');
+  }).finally(()=>{
+    if (updateBtn) { updateBtn.disabled = false; updateBtn.textContent = 'Update Product'; }
+  });
+}
+</script>
+
+</body>
+</html>
