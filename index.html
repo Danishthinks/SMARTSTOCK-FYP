@@ -88,6 +88,17 @@
       color: #fff;
     }
   </style>
+  <style>
+    :root[data-theme="dark"], [data-theme="dark"] {
+      --bg: #071025;
+      --sidebar: #0b1220;
+      --primary: #3b82f6;
+      --card: #0f1724;
+      --text-dark: #e6eef8;
+      --text-light: #9aa6bf;
+    }
+  </style>
+  <script src="theme.js"></script>
 </head>
 <body>
   <div class="sidebar">
@@ -100,7 +111,10 @@
     <!-- User info and logout -->
     <div class="user-info">
       <div id="userEmail">Loading...</div>
-      <button class="logout-btn" onclick="logout()">Logout</button>
+      <div style="display:flex;gap:8px;flex-direction:column;margin-top:8px;">
+        <button id="themeToggleBtn" class="logout-btn" style="text-align:left;">Theme</button>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+      </div>
     </div>
   </div>
 

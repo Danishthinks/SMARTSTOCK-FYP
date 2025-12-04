@@ -72,11 +72,22 @@
       font-weight: bold;
     }
   </style>
+  <style>
+    :root[data-theme="dark"], [data-theme="dark"] {
+      --bg: #071025;
+      --card: #0f1724;
+      --text-dark: #e6eef8;
+      background: var(--bg);
+    }
+  </style>
 </head>
 
 <body>
 
   <div class="register-container">
+    <div style="position:absolute;right:18px;top:18px;">
+      <button id="themeToggleBtn" style="background:transparent;border:none;cursor:pointer;font-size:18px">Theme</button>
+    </div>
     <h2>SMARTSTOCK</h2>
     <p>Create your account</p>
 
@@ -99,6 +110,8 @@
 
 
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <script src="theme.js"></script>
 
 </body>
 </html>

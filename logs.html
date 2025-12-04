@@ -12,61 +12,40 @@
   --white:#fff;
   --text-dark:#111827;
 }
-*{margin:0;padding:0;box-sizing:border-box;font-family:Arial;}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial, Helvetica, sans-serif;}
 body{display:flex;background:var(--bg);} 
-.sidebar{
-  width:230px;
-  background:var(--sidebar);
-  color:#fff;
-  height:100vh;
-  position:fixed;
-  padding:25px;
-  display:flex;
-  flex-direction:column;
-}
+.sidebar{width:230px;background:var(--sidebar);color:#fff;height:100vh;position:fixed;padding:25px;display:flex;flex-direction:column}
+.logo{font-size:22px;font-weight:600;margin-bottom:25px;text-align:center}
+.nav-link{color:#d1d5db;text-decoration:none;display:block;padding:12px;border-radius:8px;margin-bottom:8px;font-size:15px}
+.nav-link:hover, .nav-link.active{background:rgba(255,255,255,0.12);color:#fff}
+.user-info{margin-top:auto;padding-top:15px;border-top:1px solid rgba(255,255,255,0.1);font-size:14px;color:#d1d5db}
+.logout-btn{background:none;border:none;color:#d1d5db;padding:5px 0;margin-top:8px;cursor:pointer;font-size:14px;width:100%;text-align:left}
+.logout-btn:hover{color:#fff}
+.error-row td{padding:20px;text-align:center;color:#b00020}
+.main{margin-left:230px;padding:35px;width:100%}
+.heading{font-size:22px;font-weight:bold;margin-bottom:20px;color:var(--text-dark)}
+table{width:100%;border-collapse:collapse;background:white;box-shadow:0 4px 10px rgba(0,0,0,0.08)}
+th,td{padding:12px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:14px}
+th{background:#eef2ff;font-weight:bold;color:#111}
+.loading-row td{padding:20px;text-align:center;color:#666}
+.filter-box{display:flex;gap:10px;margin-bottom:20px}
+.filter-box select{padding:8px;border:1px solid #ccc;border-radius:6px}
+/* Keep print-area off-screen to avoid showing export HTML in the UI */
+#print-area{position:absolute;left:-9999px;top:0;width:1px;height:1px;overflow:hidden}
 
-/* User info styles */
-.user-info {
-  margin-top: auto;
-  padding-top: 15px;
-  border-top: 1px solid rgba(255,255,255,0.1);
-  font-size: 14px;
-  color: #d1d5db;
+/* Dark theme overrides */
+:root[data-theme="dark"], [data-theme="dark"] {
+  --bg: #071025;
+  --sidebar: #0b1220;
+  --primary: #3b82f6;
+  --white: #0f1724;
+  --text-dark: #e6eef8;
 }
-
-.logout-btn {
-  background: none;
-  border: none;
-  color: #d1d5db;
-  padding: 5px 0;
-  margin-top: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  width: 100%;
-  text-align: left;
-}
-
-.logout-btn:hover { color: #fff; }
-
-.error-row td {
-  padding: 20px;
-  text-align: center;
-  color: #b00020;
-}
-.logo{font-size:22px;font-weight:600;margin-bottom:25px;text-align:center;}
-.nav-link{color:#d1d5db;text-decoration:none;display:block;padding:12px;border-radius:8px;margin-bottom:8px;font-size:15px;}
-.nav-link:hover, .active{background:rgba(255,255,255,0.12);color:#fff;}
-.main{margin-left:230px;padding:35px;width:100%;}
-.heading{font-size:22px;font-weight:bold;margin-bottom:20px;color:var(--text-dark);} 
-table{width:100%;border-collapse:collapse;background:white;box-shadow:0 4px 10px rgba(0,0,0,0.08);} 
-th,td{padding:12px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:14px;}
-th{background:#eef2ff;font-weight:bold;color:#111;} 
-.loading-row td{padding:20px;text-align:center;color:#666;} 
-.filter-box{display:flex;gap:10px;margin-bottom:20px;}
-.filter-box select{padding:8px;border:1px solid #ccc;border-radius:6px;}
 </style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 </head>
-<body>
 <div class="sidebar">
   <div class="logo">SMARTSTOCK</div>
   <a class="nav-link" href="index.html">Dashboard</a>
@@ -77,7 +56,10 @@ th{background:#eef2ff;font-weight:bold;color:#111;}
   <!-- User info and logout -->
   <div class="user-info">
     <div id="userEmail">Loading...</div>
-    <button class="logout-btn" onclick="logout()">Logout</button>
+    <div style="display:flex;gap:8px;flex-direction:column;margin-top:8px;">
+      <button id="themeToggleBtn" class="logout-btn" style="text-align:left;">Theme</button>
+      <button class="logout-btn" onclick="logout(event)">Logout</button>
+    </div>
   </div>
 </div>
 <div class="main">
@@ -94,6 +76,7 @@ th{background:#eef2ff;font-weight:bold;color:#111;}
       <option value="UPDATE PRODUCT">UPDATE PRODUCT</option>
     </select>
     <button onclick="exportLogsExcel()" style="padding:8px 12px; background:#2563eb; color:white; border:none; border-radius:6px; cursor:pointer;">Export Logs Excel</button>
+    <button onclick="exportLogsPDF()" style="padding:8px 12px; background:#dc2626; color:white; border:none; border-radius:6px; cursor:pointer;">Export PDF</button>
   </div>
   <table>
     <thead>
@@ -104,6 +87,7 @@ th{background:#eef2ff;font-weight:bold;color:#111;}
     <tbody id="logsTable"></tbody>
   </table>
 </div>
+<script src="theme.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -113,18 +97,16 @@ th{background:#eef2ff;font-weight:bold;color:#111;}
 let logsData = [];
 
 // Logout function
-function logout() {
+function logout(ev) {
   if (typeof auth !== 'undefined') {
-    const btn = event.target;
-    btn.disabled = true;
-    btn.textContent = 'Logging out...';
-    
+    const btn = ev && ev.target ? ev.target : null;
+    if (btn) { btn.disabled = true; btn.textContent = 'Logging out...'; }
+
     auth.signOut()
       .then(() => window.location.href = 'login.html')
       .catch(err => {
         console.error('Logout error:', err);
-        btn.disabled = false;
-        btn.textContent = 'Logout';
+        if (btn) { btn.disabled = false; btn.textContent = 'Logout'; }
         alert('Error logging out: ' + err.message);
       });
   }
@@ -236,6 +218,52 @@ function applyFilter() {
 }
 </script>
 
+<script>
+function exportLogsPDF() {
+  const rows = getFilteredLogs();
+  if (!rows || !rows.length) { alert('No logs to export'); return; }
+  if (typeof jspdf === 'undefined' || typeof jspdf.jsPDF !== 'function') { alert('PDF library not available'); return; }
+
+  try {
+    const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 10;
+    const cols = ['Time','User','Action','Product','Quantity'];
+    const colCount = cols.length;
+    const colWidth = (pageWidth - margin*2) / colCount;
+    let y = 20;
+    pdf.setFontSize(12);
+    pdf.text('SMARTSTOCK - Activity Logs', pageWidth/2, 12, { align: 'center' });
+    pdf.setFontSize(10);
+    cols.forEach((h,i) => pdf.text(String(h), margin + i*colWidth + 2, y));
+    y += 6; pdf.setFontSize(9);
+
+    rows.forEach(r => {
+      const time = r.timestamp ? r.timestamp.toDate().toLocaleString() : '';
+      const cells = [time, r.user || '', r.action || '', r.productName || '', String(r.quantity ?? '')];
+      const cellLines = cells.map(c => pdf.splitTextToSize(String(c), colWidth - 4));
+      const maxLines = Math.max(...cellLines.map(arr => arr.length));
+      if (y + maxLines*5 > pageHeight - margin) { pdf.addPage(); y = 20; }
+
+      for (let li = 0; li < maxLines; li++) {
+        cellLines.forEach((lines, ci) => {
+          const text = lines[li] || '';
+          pdf.text(text, margin + ci*colWidth + 2, y + li*5);
+        });
+      }
+      y += maxLines*5;
+    });
+
+    const date = new Date().toISOString().slice(0,10);
+    pdf.save(`Activity_Logs_${date}.pdf`);
+  } catch (err) {
+    console.error('Logs PDF export failed:', err);
+    alert('PDF export failed.');
+  }
+}
+</script>
+
 <!-- Export logs to CSV (Excel-friendly), uses current filters -->
 <script>
 function escapeCsv(value) {
@@ -290,6 +318,8 @@ function exportLogsExcel() {
   link.remove();
 }
 </script>
+
+<!-- PDF export removed to avoid UI injection issues -->
 
 </body>
 </html>
