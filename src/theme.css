@@ -1,0 +1,25 @@
+:root[data-theme="light"] {
+  --bg: #f7f9fb;
+  --sidebar: #1f2937;
+  --primary: #000000;
+  --card: #ffffff;
+  --text-dark: #111827;
+  --text-light: #6b7280;
+  --button-text: #FFFFFF;
+}
+
+:root[data-theme="dark"] {
+  --bg: #000000;
+  --sidebar: #0a0a0a;
+  --primary: #FFFFFF;
+  --card: #181a1f;
+  --text-dark: #e6eef8;
+  --text-light: #9aa6bf;
+  --button-text: #000000;
+}
+
+/* Use variables */
+body {
+  background-color: var(--bg);
+  color: var(--text-dark);
+}
