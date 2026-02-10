@@ -10,9 +10,13 @@ import { Eye, EyeOff } from "lucide-react";
 
 export default function Register() {
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const navigate = useNavigate();
@@ -51,8 +55,24 @@ export default function Register() {
       setError("Please enter your email.");
       return;
     }
+    if (!username.trim()) {
+      setError("Please enter a username.");
+      return;
+    }
     if (!password) {
       setError("Please enter your password.");
+      return;
+    }
+    if (!confirmPassword) {
+      setError("Please confirm your password.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
       return;
     }
 
@@ -91,44 +111,66 @@ export default function Register() {
       </div>
 
       {/* REGISTER CARD */}
-      <div className="mx-auto w-full max-w-sm">
+      <div className="mx-auto w-full max-w-md">
         <div
-          className="relative rounded-xl p-8 text-center text-slate-900 dark:bg-[#181a1f] dark:text-slate-100"
+          className="relative rounded-xl p-8 text-center text-slate-900 dark:bg-[#181a1f] dark:text-slate-100 border-2 border-blue-500"
           style={glassCardStyle}
         >
-          <h2 className="mb-2 text-2xl font-bold text-black dark:text-slate-100">
+          <h2 className="mb-1 text-3xl font-bold text-black dark:text-slate-100">
             SMARTSTOCK
           </h2>
-          <p className="mb-5 text-sm text-black dark:text-slate-400">
-            Create your account
+          <p className="mb-6 text-sm font-semibold text-blue-600 dark:text-blue-400">
+            Create Your Account
           </p>
 
           <form onSubmit={handleRegister}>
-            {/* Input Fields */}
+            {/* Email Field */}
             <input
               type="email"
               id="register-email"
-              placeholder="Email"
-              className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-black focus:ring-2 focus:ring-black dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-slate-400 dark:focus:ring-slate-400"
+              placeholder="Email Address"
+              className="mb-3 w-full rounded-lg border border-slate-300 px-3 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-400"
               style={glassInputStyle}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
 
+            {/* Username Field */}
+            <input
+              type="text"
+              id="register-username"
+              placeholder="Username"
+              className="mb-3 w-full rounded-lg border border-slate-300 px-3 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-400"
+              style={glassInputStyle}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+            />
+
+            {/* Company Name Field */}
+            <input
+              type="text"
+              id="register-company"
+              placeholder="Company Name (Optional)"
+              className="mb-3 w-full rounded-lg border border-slate-300 px-3 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-400"
+              style={glassInputStyle}
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+            />
+
             {/* Password + Eye Icon */}
-            <div className="relative mb-4">
+            <div className="relative mb-3">
               <input
                 type={showPassword ? "text" : "password"}
                 id="password"
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-3 pr-10 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-black focus:ring-2 focus:ring-black dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-slate-400 dark:focus:ring-slate-400"
+                className="w-full rounded-lg border border-slate-300 px-3 py-3 pr-10 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-400"
                 style={glassInputStyle}
                 required
               />
-              {/* Eye Icon Button */}
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
@@ -138,16 +180,37 @@ export default function Register() {
               </button>
             </div>
 
+            {/* Confirm Password + Eye Icon */}
+            <div className="relative mb-3">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                id="confirm-password"
+                placeholder="Confirm Password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-3 pr-10 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-400"
+                style={glassInputStyle}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+              >
+                {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+
             {/* Error Message */}
             {error && (
-              <div className="mb-4 mt-2 text-sm text-red-600">
+              <div className="mb-4 mt-2 rounded-lg bg-red-100 p-3 text-sm text-red-700 dark:bg-red-900 dark:text-red-200">
                 {error}
               </div>
             )}
 
             {/* Success Message */}
             {success && (
-              <div className="mb-4 mt-2 text-sm text-green-600">
+              <div className="mb-4 mt-2 rounded-lg bg-green-100 p-3 text-sm text-green-700 dark:bg-green-900 dark:text-green-200">
                 {success}
               </div>
             )}
@@ -156,20 +219,20 @@ export default function Register() {
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-2 w-full rounded-lg bg-black dark:bg-white py-3 text-sm font-medium text-white dark:text-black transition hover:bg-gray-800 dark:hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-70"
+              className="mt-4 w-full rounded-lg bg-blue-600 dark:bg-blue-500 py-3 text-sm font-bold text-white transition hover:bg-blue-700 dark:hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {isLoading ? "Creating account..." : "Register"}
             </button>
           </form>
 
           {/* Footer */}
-          <div className="mt-4 text-sm text-slate-700 dark:text-slate-300">
+          <div className="mt-5 border-t border-slate-300 pt-4 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-300">
             Already have an account?{" "}
             <Link
               to="/"
-              className="font-semibold text-black hover:underline dark:text-white dark:font-bold"
+              className="font-semibold text-blue-600 hover:underline dark:text-blue-400"
             >
-              Login
+              Sign In
             </Link>
           </div>
         </div>

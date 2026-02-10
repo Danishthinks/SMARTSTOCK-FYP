@@ -6,6 +6,8 @@
   --text-dark: #111827;
   --text-light: #6b7280;
   --button-text: #FFFFFF;
+  --input-bg: #ffffff;
+  --input-disabled: #f3f4f6;
 }
 
 :root[data-theme="dark"] {
@@ -16,6 +18,8 @@
   --text-dark: #e6eef8;
   --text-light: #9aa6bf;
   --button-text: #000000;
+  --input-bg: #0f1015;
+  --input-disabled: #2a2d35;
 }
 
 /* Use variables */

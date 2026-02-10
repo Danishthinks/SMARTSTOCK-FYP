@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../../Components/DashboardLayout';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, onSnapshot, query } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
 import { addLog } from '../../lib/firebase-logs';
+import { pushNotification, sendCrudNotification } from '../../lib/notifications';
 
 export default function AddProduct() {
   const [formData, setFormData] = useState({
@@ -11,10 +12,34 @@ export default function AddProduct() {
     category: '',
     quantity: '',
     purchasePrice: '',
-    sellingPrice: ''
+    sellingPrice: '',
+    warehouse: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
+  const [warehouses, setWarehouses] = useState([]);
+
+  // Fetch warehouses
+  useEffect(() => {
+    if (!db) return;
+
+    const warehousesQuery = query(collection(db, 'warehouses'));
+    const unsubscribe = onSnapshot(
+      warehousesQuery,
+      (snapshot) => {
+        const warehousesData = [];
+        snapshot.forEach((doc) => {
+          warehousesData.push({ name: doc.data().name, id: doc.id });
+        });
+        setWarehouses(warehousesData);
+      },
+      (error) => {
+        console.error('Error loading warehouses:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
 
   const showMessage = (text, type = 'error') => {
     setMessage({ text, type });
@@ -32,10 +57,10 @@ export default function AddProduct() {
     e.preventDefault();
     setMessage({ text: '', type: '' });
 
-    const { productId, name, category, quantity, purchasePrice, sellingPrice } = formData;
+    const { productId, name, category, quantity, purchasePrice, sellingPrice, warehouse } = formData;
 
     // Validate inputs
-    if (!productId.trim() || !name.trim() || !category.trim() || !quantity || !purchasePrice || !sellingPrice) {
+    if (!productId.trim() || !name.trim() || !category.trim() || !quantity || !purchasePrice || !sellingPrice || !warehouse) {
       showMessage('⚠️ Please fill all fields', 'warning');
       return;
     }
@@ -77,12 +102,20 @@ export default function AddProduct() {
         quantity: qtyNum,
         purchasePrice: priceNum,
         sellingPrice: sellNum,
+        warehouse: warehouse.trim(),
         createdAt: serverTimestamp(),
         createdBy: auth.currentUser.uid
       });
 
       // Log the action
       addLog('ADD PRODUCT', name.trim(), qtyNum);
+      pushNotification('Product added', {
+        body: `${name.trim()} (Qty: ${qtyNum}) was added to ${warehouse.trim()}.`
+      });
+      sendCrudNotification({
+        title: 'Product added',
+        body: `${name.trim()} (Qty: ${qtyNum}) was added to ${warehouse.trim()}.`
+      });
 
       showMessage('✅ Product Added Successfully', 'success');
       // Reset form
@@ -92,7 +125,8 @@ export default function AddProduct() {
         category: '',
         quantity: '',
         purchasePrice: '',
-        sellingPrice: ''
+        sellingPrice: '',
+        warehouse: ''
       });
     } catch (err) {
       console.error('Error adding product:', err);
@@ -269,6 +303,37 @@ export default function AddProduct() {
                 color: 'var(--text-dark)'
               }}
             />
+          </div>
+
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-dark)', display: 'block', marginBottom: '5px' }}>
+              Warehouse *
+            </label>
+            <select
+              name="warehouse"
+              value={formData.warehouse}
+              onChange={handleChange}
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '1px solid #ccc',
+                borderRadius: '6px',
+                marginTop: '5px',
+                fontSize: '14px',
+                backgroundColor: 'var(--card)',
+                color: 'var(--text-dark)'
+              }}
+            >
+              <option value="">Select a warehouse</option>
+              {warehouses.map((w) => (
+                <option key={w.id} value={w.name}>{w.name}</option>
+              ))}
+            </select>
+            {warehouses.length === 0 && (
+              <small style={{ color: '#ef4444', display: 'block', marginTop: '5px' }}>
+                📍 No warehouses found. Create one in Warehouses section first.
+              </small>
+            )}
           </div>
 
           <button

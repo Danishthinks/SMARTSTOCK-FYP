@@ -50,3 +50,35 @@ exports.groqChat = functions.https.onRequest((req, res) => {
     }
   });
 });
+
+exports.notifyCrud = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Authentication required");
+  }
+
+  const title = data?.title || "SmartStock";
+  const body = data?.body || "Inventory updated";
+
+  const tokensSnap = await admin.firestore().collection("fcmTokens").get();
+  const tokens = tokensSnap.docs.map((doc) => doc.id).filter(Boolean);
+
+  if (tokens.length === 0) {
+    return { success: true, sent: 0 };
+  }
+
+  const chunks = [];
+  for (let i = 0; i < tokens.length; i += 500) {
+    chunks.push(tokens.slice(i, i + 500));
+  }
+
+  let sent = 0;
+  for (const chunk of chunks) {
+    const result = await admin.messaging().sendEachForMulticast({
+      tokens: chunk,
+      notification: { title, body }
+    });
+    sent += result.successCount;
+  }
+
+  return { success: true, sent };
+});

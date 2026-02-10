@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
+import { MessageCircle, X } from "lucide-react";
 
 export default function ChatbotWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -8,12 +9,14 @@ export default function ChatbotWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [products, setProducts] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
   const [messages, setMessages] = useState([
     {
       role: "assistant",
-      content: "Hi! I\"m SmartStock AI. Ask me about inventory, low stock, or trends."
+      content: "Hi! I'm SmartStock AI. Ask me about inventory, warehouses, low stock, or product details."
     }
   ]);
+  const messagesEndRef = useRef(null);
 
   const apiKey = useMemo(
     () => process.env.REACT_APP_GROQ_API_KEY || "",
@@ -23,7 +26,7 @@ export default function ChatbotWidget() {
   useEffect(() => {
     if (!db) return;
 
-    const unsubscribe = onSnapshot(
+    const unsubProducts = onSnapshot(
       collection(db, "products"),
       (snapshot) => {
         const items = [];
@@ -37,8 +40,31 @@ export default function ChatbotWidget() {
       }
     );
 
-    return () => unsubscribe();
+    const unsubWarehouses = onSnapshot(
+      collection(db, "warehouses"),
+      (snapshot) => {
+        const items = [];
+        snapshot.forEach((doc) => {
+          items.push({ id: doc.id, ...doc.data() });
+        });
+        setWarehouses(items);
+      },
+      () => {
+        console.error("Failed to load warehouses data.");
+      }
+    );
+
+    return () => {
+      unsubProducts();
+      unsubWarehouses();
+    };
   }, []);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
 
   const normalizeText = (value) =>
     (value || "").toString().trim().toLowerCase();
@@ -47,8 +73,64 @@ export default function ChatbotWidget() {
     const query = normalizeText(text);
     if (!query) return null;
 
+    // Check for warehouse queries FIRST (before product queries)
+    if (/warehouse|location|where|storage/i.test(query)) {
+      // List all warehouses
+      if (/list|show all|all warehouse/i.test(query) && !/specific|about|details|in/.test(query)) {
+        if (warehouses.length === 0) return "No warehouses found. Create one in the Warehouses section.";
+        const list = warehouses.map((w, idx) => {
+          const whProducts = products.filter(p => p.warehouse === w.name);
+          return `${idx + 1}. ${w.name} - ${w.location}\n   Manager: ${w.manager || 'Not assigned'}\n   Products: ${whProducts.length}`;
+        }).join('\n\n');
+        return `📍 Your Warehouses (${warehouses.length}):\n\n${list}`;
+      }
+
+      // Find specific warehouse by name
+      const matchedWarehouse = warehouses.find(w => 
+        w.name && query.includes(normalizeText(w.name))
+      );
+      
+      if (matchedWarehouse) {
+        const whProducts = products.filter(p => p.warehouse === matchedWarehouse.name);
+        const totalQty = whProducts.reduce((sum, p) => sum + (p.quantity || 0), 0);
+        const totalValue = whProducts.reduce((sum, p) => sum + ((p.purchasePrice || 0) * (p.quantity || 0)), 0);
+        
+        let response = `📍 ${matchedWarehouse.name}\n`;
+        response += `Location: ${matchedWarehouse.location}\n`;
+        response += `Manager: ${matchedWarehouse.manager || 'Not assigned'}\n`;
+        if (matchedWarehouse.contact) response += `Contact: ${matchedWarehouse.contact}\n`;
+        response += `\nInventory Summary:\n`;
+        response += `• Products: ${whProducts.length}\n`;
+        response += `• Total Quantity: ${totalQty}\n`;
+        response += `• Total Value: Rs. ${totalValue.toLocaleString()}\n`;
+        
+        if (whProducts.length > 0) {
+          response += `\nProducts:\n`;
+          const productList = whProducts.slice(0, 10).map(p => 
+            `• ${p.name} (${p.category || 'N/A'}): Qty ${p.quantity ?? 0}`
+          ).join('\n');
+          response += productList;
+          if (whProducts.length > 10) response += `\n...and ${whProducts.length - 10} more`;
+        } else {
+          response += `\nNo products in this warehouse yet.`;
+        }
+        
+        return response;
+      }
+    }
+
+    // Low stock query
+    if (/low stock|running low|need restock|alert/i.test(query)) {
+      const lowStockItems = products.filter(p => (p.quantity || 0) < 5);
+      if (lowStockItems.length === 0) return "✅ All products are well stocked!";
+      const list = lowStockItems.slice(0, 5).map(p => 
+        `• ${p.name}: ${p.quantity ?? 0} left${p.warehouse ? ` (${p.warehouse})` : ''}`
+      ).join('\n');
+      return `⚠️ Low Stock Items (${lowStockItems.length}):\n${list}${lowStockItems.length > 5 ? '\n...and more' : ''}`;
+    }
+
     const isProductQuery =
-      /quantity|stock|how many|available|in stock|price|buy|sell|purchase|details|info|specifications|specs/.test(query);
+      /quantity|stock|how many|available|in stock|price|buy|sell|purchase|info|specifications|specs/i.test(query);
 
     if (!isProductQuery || products.length === 0) return null;
 
@@ -133,10 +215,11 @@ export default function ChatbotWidget() {
         return;
       }
 
+      const inventoryContext = `Current Inventory: ${products.length} products across ${warehouses.length} warehouses. Total stock value: Rs. ${products.reduce((sum, p) => sum + ((p.purchasePrice || 0) * (p.quantity || 0)), 0).toLocaleString()}.`;
+
       const systemMessage = {
         role: "system",
-        content:
-          "You are SmartStock AI assistant for inventory management. Be concise and helpful."
+        content: `You are SmartStock AI, a helpful inventory assistant. Be direct and conversational. Answer questions immediately with available data. Never ask for credentials or unnecessary details - just provide the information the user needs. ${inventoryContext} If asked about specific products, warehouses, or stock levels, give clear, concise answers without requesting additional information.`
       };
 
       const response = await fetch(
@@ -186,17 +269,21 @@ export default function ChatbotWidget() {
           width: "56px",
           height: "56px",
           borderRadius: "50%",
-          background: "var(--primary)",
+          background: "linear-gradient(135deg, #2563eb, #7c3aed)",
           color: "var(--button-text)",
           border: "none",
-          boxShadow: "0 8px 20px rgba(0,0,0,0.2)",
+          boxShadow: "0 10px 24px rgba(0,0,0,0.25)",
           cursor: "pointer",
           zIndex: 9999,
           fontSize: "20px",
-          fontWeight: 700
+          fontWeight: 700,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "6px"
         }}
       >
-        {isOpen ? "×" : "AI"}
+        {isOpen ? <X size={22} /> : <MessageCircle size={22} />}
       </button>
 
       {isOpen && (
@@ -209,7 +296,7 @@ export default function ChatbotWidget() {
             maxHeight: "420px",
             background: "var(--card)",
             borderRadius: "12px",
-            boxShadow: "0 12px 30px rgba(0,0,0,0.2)",
+            boxShadow: "0 12px 30px rgba(0,0,0,0.25)",
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
@@ -221,10 +308,19 @@ export default function ChatbotWidget() {
               padding: "12px 14px",
               borderBottom: "1px solid rgba(255,255,255,0.06)",
               fontWeight: 600,
-              color: "var(--text-dark)"
+              color: "var(--text-dark)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              userSelect: "none",
+              background: "linear-gradient(90deg, rgba(37,99,235,0.15), rgba(124,58,237,0.15))"
             }}
           >
-            SmartStock AI
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <MessageCircle size={16} />
+              SmartStock AI
+            </div>
+            <span style={{ fontSize: "11px", opacity: 0.7 }}>Online</span>
           </div>
 
           <div
@@ -244,8 +340,8 @@ export default function ChatbotWidget() {
                   alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
                   background:
                     msg.role === "user"
-                      ? "var(--primary)"
-                      : "rgba(255,255,255,0.06)",
+                      ? "linear-gradient(135deg, #2563eb, #7c3aed)"
+                      : "rgba(15,23,42,0.06)",
                   color:
                     msg.role === "user"
                       ? "var(--button-text)"
@@ -254,12 +350,14 @@ export default function ChatbotWidget() {
                   borderRadius: "10px",
                   maxWidth: "85%",
                   fontSize: "13px",
-                  lineHeight: 1.4
+                  lineHeight: 1.4,
+                  whiteSpace: "pre-wrap"
                 }}
               >
                 {msg.content}
               </div>
             ))}
+            <div ref={messagesEndRef} />
           </div>
 
           {error && (
@@ -295,7 +393,7 @@ export default function ChatbotWidget() {
                 flex: 1,
                 padding: "8px 10px",
                 borderRadius: "8px",
-                border: "1px solid #333",
+                border: "1px solid rgba(148,163,184,0.5)",
                 background: "var(--card)",
                 color: "var(--text-dark)",
                 fontSize: "13px"
@@ -307,7 +405,7 @@ export default function ChatbotWidget() {
               style={{
                 padding: "8px 12px",
                 borderRadius: "8px",
-                background: "var(--primary)",
+                background: "linear-gradient(135deg, #2563eb, #7c3aed)",
                 color: "var(--button-text)",
                 border: "none",
                 cursor: isLoading ? "not-allowed" : "pointer",

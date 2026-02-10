@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { auth } from '../lib/firebase';
+import { registerFcmToken } from '../lib/fcm';
 import { onAuthStateChanged } from 'firebase/auth';
 
 const AuthContext = createContext();
@@ -20,6 +21,9 @@ export const AuthProvider = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setLoading(false);
+      if (user) {
+        registerFcmToken().catch(() => {});
+      }
     });
 
     return unsubscribe;

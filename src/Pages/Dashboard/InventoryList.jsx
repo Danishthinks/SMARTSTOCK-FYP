@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../../Components/DashboardLayout';
-import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { addLog } from '../../lib/firebase-logs';
 import { addProductIdsToExistingProducts } from '../../lib/update-product-ids';
+import { pushNotification, sendCrudNotification } from '../../lib/notifications';
 
 export default function InventoryList() {
   const [products, setProducts] = useState([]);
@@ -12,6 +13,12 @@ export default function InventoryList() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [adjustingId, setAdjustingId] = useState(null);
+  const [adjustQty, setAdjustQty] = useState(0);
+  const [undoItem, setUndoItem] = useState(null);
+  const [undoTimer, setUndoTimer] = useState(null);
 
   useEffect(() => {
     if (!db) {
@@ -44,6 +51,14 @@ export default function InventoryList() {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (undoTimer) {
+        clearTimeout(undoTimer);
+      }
+    };
+  }, [undoTimer]);
 
   const updateProductIds = async () => {
     if (!window.confirm('This will add generic Product IDs (PROD-001, PROD-002, etc.) to all products that don\'t have one. Continue?')) {
@@ -84,9 +99,113 @@ export default function InventoryList() {
       const product = products.find((p) => p.id === id);
       await deleteDoc(doc(db, 'products', id));
       addLog('DELETE PRODUCT', productName, product?.quantity || 0);
+      pushNotification('Product deleted', {
+        body: `${productName} was removed.`
+      });
+      sendCrudNotification({
+        title: 'Product deleted',
+        body: `${productName} was removed.`
+      });
+
+      if (product) {
+        if (undoTimer) clearTimeout(undoTimer);
+        setUndoItem(product);
+        const timer = setTimeout(() => setUndoItem(null), 6000);
+        setUndoTimer(timer);
+      }
     } catch (err) {
       console.error('Delete error:', err);
       alert('Error deleting product: ' + err.message);
+    }
+  };
+
+  const handleEditClick = (product) => {
+    setEditingId(product.id);
+    setEditFormData({
+      name: product.name,
+      category: product.category,
+      purchasePrice: product.purchasePrice,
+      sellingPrice: product.sellingPrice
+    });
+  };
+
+  const handleEditSubmit = async (id) => {
+    try {
+      const product = products.find((p) => p.id === id);
+      await updateDoc(doc(db, 'products', id), editFormData);
+      addLog('UPDATE PRODUCT', editFormData.name, product?.quantity || 0);
+      pushNotification('Product updated', {
+        body: `${editFormData.name || product?.name || 'Product'} updated.`
+      });
+      sendCrudNotification({
+        title: 'Product updated',
+        body: `${editFormData.name || product?.name || 'Product'} updated.`
+      });
+      setEditingId(null);
+      alert('Product updated successfully');
+    } catch (err) {
+      console.error('Update error:', err);
+      alert('Error updating product: ' + err.message);
+    }
+  };
+
+  const handleAdjustClick = (product) => {
+    setAdjustingId(product.id);
+    setAdjustQty(0);
+  };
+
+  const handleAdjustSubmit = async (id) => {
+    if (adjustQty === 0) {
+      alert('Please enter a quantity change');
+      return;
+    }
+
+    try {
+      const product = products.find((p) => p.id === id);
+      const newQuantity = Math.max(0, (product.quantity || 0) + Number(adjustQty));
+      await updateDoc(doc(db, 'products', id), { quantity: newQuantity });
+      addLog('STOCK ADJUST', product.name, newQuantity);
+      pushNotification('Stock adjusted', {
+        body: `${product.name}: ${product.quantity || 0} → ${newQuantity}`
+      });
+      sendCrudNotification({
+        title: 'Stock adjusted',
+        body: `${product.name}: ${product.quantity || 0} → ${newQuantity}`
+      });
+      setAdjustingId(null);
+      setAdjustQty(0);
+      alert('Stock adjusted successfully');
+    } catch (err) {
+      console.error('Adjust stock error:', err);
+      alert('Error adjusting stock: ' + err.message);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!undoItem) return;
+
+    try {
+      const { id, ...data } = undoItem;
+      await setDoc(doc(db, 'products', id), {
+        ...data,
+        restoredAt: serverTimestamp()
+      }, { merge: true });
+
+      addLog('RESTORE PRODUCT', data.name || 'Product', data.quantity || 0);
+      pushNotification('Product restored', {
+        body: `${data.name || 'Product'} was restored.`
+      });
+      sendCrudNotification({
+        title: 'Product restored',
+        body: `${data.name || 'Product'} was restored.`
+      });
+    } catch (err) {
+      console.error('Restore error:', err);
+      alert('Error restoring product: ' + err.message);
+    } finally {
+      setUndoItem(null);
+      if (undoTimer) clearTimeout(undoTimer);
+      setUndoTimer(null);
     }
   };
 
@@ -96,13 +215,15 @@ export default function InventoryList() {
       return;
     }
 
-    const headers = ['Product ID', 'Name', 'Category', 'Quantity', 'Purchase Price', 'Selling Price'];
+    const headers = ['Product ID', 'Name', 'Category', 'Warehouse', 'Quantity', 'Purchase Price', 'Selling Price'];
     let csv = headers.join(',') + '\n';
 
     filteredProducts.forEach((p) => {
       const line = [
         `"${(p.productId || '').replace(/"/g, '""')}"`,
+        `"${(p.name || '').replace(/"/g, '""')}"`,
         `"${(p.category || '').replace(/"/g, '""')}"`,
+        `"${(p.warehouse || 'Not assigned').replace(/"/g, '""')}"`,
         p.quantity ?? '',
         p.purchasePrice ?? '',
         p.sellingPrice ?? ''
@@ -143,7 +264,7 @@ export default function InventoryList() {
     y += 15;
 
     pdf.setFontSize(10);
-    const headers = ['ID', 'Name', 'Category', 'Qty', 'Buy Price', 'Sell Price'];
+    const headers = ['ID', 'Name', 'Category', 'Warehouse', 'Qty', 'Buy Price', 'Sell Price'];
     const colWidth = (pageWidth - 2 * margin) / headers.length;
 
     headers.forEach((h, i) => {
@@ -162,6 +283,7 @@ export default function InventoryList() {
         p.productId || '',
         p.name || '',
         p.category || '',
+        p.warehouse || 'Not assigned',
         String(p.quantity ?? ''),
         String(p.purchasePrice ?? ''),
         String(p.sellingPrice ?? '')
@@ -277,7 +399,8 @@ export default function InventoryList() {
           backgroundColor: 'var(--card)',
           boxShadow: '0 4px 10px rgba(0,0,0,0.08)',
           borderRadius: '8px',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          marginBottom: '20px'
         }}
       >
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -291,6 +414,9 @@ export default function InventoryList() {
               </th>
               <th style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#111' }}>
                 Category
+              </th>
+              <th style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#111' }}>
+                Warehouse
               </th>
               <th style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#111' }}>
                 Qty
@@ -309,13 +435,13 @@ export default function InventoryList() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="7" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                <td colSpan="8" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
                   Loading products...
                 </td>
               </tr>
             ) : filteredProducts.length === 0 ? (
               <tr>
-                <td colSpan="7" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                <td colSpan="8" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
                   No products found
                 </td>
               </tr>
@@ -338,6 +464,20 @@ export default function InventoryList() {
                     </td>
                     <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontSize: '14px' }}>
                       {product.category || ''}
+                    </td>
+                    <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontSize: '14px' }}>
+                      <span
+                        style={{
+                          backgroundColor: '#e0e7ff',
+                          color: '#3730a3',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '13px',
+                          fontWeight: 500
+                        }}
+                      >
+                        📍 {product.warehouse || 'Not assigned'}
+                      </span>
                     </td>
                     <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontSize: '14px' }}>
                       {quantity}
@@ -363,7 +503,35 @@ export default function InventoryList() {
                     <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontSize: '14px' }}>
                       Rs. {product.sellingPrice?.toLocaleString() || 0}
                     </td>
-                    <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontSize: '14px' }}>
+                    <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontSize: '14px', display: 'flex', gap: '6px' }}>
+                      <button
+                        onClick={() => handleEditClick(product)}
+                        style={{
+                          cursor: 'pointer',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          border: 'none',
+                          background: '#2563eb',
+                          color: '#fff'
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleAdjustClick(product)}
+                        style={{
+                          cursor: 'pointer',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          border: 'none',
+                          background: '#059669',
+                          color: '#fff'
+                        }}
+                      >
+                        Adjust Stock
+                      </button>
                       <button
                         onClick={() => handleDelete(product.id, product.name)}
                         style={{
@@ -386,6 +554,279 @@ export default function InventoryList() {
           </tbody>
         </table>
       </div>
+
+      {/* Edit Modal */}
+      {editingId && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'var(--card)',
+            padding: '25px',
+            borderRadius: '12px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+            maxWidth: '400px',
+            width: '90%'
+          }}>
+            <h3 style={{ marginBottom: '20px', fontSize: '18px', fontWeight: 'bold', color: 'var(--text-dark)' }}>
+              Edit Product
+            </h3>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-dark)', display: 'block', marginBottom: '5px' }}>
+                Product Name
+              </label>
+              <input
+                type="text"
+                value={editFormData.name || ''}
+                onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid #ccc',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  backgroundColor: 'var(--card)',
+                  color: 'var(--text-dark)',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-dark)', display: 'block', marginBottom: '5px' }}>
+                Category
+              </label>
+              <input
+                type="text"
+                value={editFormData.category || ''}
+                onChange={(e) => setEditFormData({ ...editFormData, category: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid #ccc',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  backgroundColor: 'var(--card)',
+                  color: 'var(--text-dark)',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-dark)', display: 'block', marginBottom: '5px' }}>
+                Purchase Price
+              </label>
+              <input
+                type="number"
+                value={editFormData.purchasePrice || ''}
+                onChange={(e) => setEditFormData({ ...editFormData, purchasePrice: Number(e.target.value) })}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid #ccc',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  backgroundColor: 'var(--card)',
+                  color: 'var(--text-dark)',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-dark)', display: 'block', marginBottom: '5px' }}>
+                Selling Price
+              </label>
+              <input
+                type="number"
+                value={editFormData.sellingPrice || ''}
+                onChange={(e) => setEditFormData({ ...editFormData, sellingPrice: Number(e.target.value) })}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid #ccc',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  backgroundColor: 'var(--card)',
+                  color: 'var(--text-dark)',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => handleEditSubmit(editingId)}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  background: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setEditingId(null)}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  background: '#6b7280',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Adjust Stock Modal */}
+      {adjustingId && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'var(--card)',
+            padding: '25px',
+            borderRadius: '12px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+            maxWidth: '400px',
+            width: '90%'
+          }}>
+            <h3 style={{ marginBottom: '20px', fontSize: '18px', fontWeight: 'bold', color: 'var(--text-dark)' }}>
+              Adjust Stock
+            </h3>
+            <p style={{ marginBottom: '15px', fontSize: '14px', color: 'var(--text-dark)' }}>
+              Current Quantity: <strong>{products.find((p) => p.id === adjustingId)?.quantity || 0}</strong>
+            </p>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-dark)', display: 'block', marginBottom: '5px' }}>
+                Change (e.g., +5 or -3)
+              </label>
+              <input
+                type="number"
+                value={adjustQty}
+                onChange={(e) => setAdjustQty(Number(e.target.value))}
+                placeholder="Enter change amount"
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid #ccc',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  backgroundColor: 'var(--card)',
+                  color: 'var(--text-dark)',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <p style={{ marginBottom: '20px', fontSize: '14px', color: '#6b7280' }}>
+              New Quantity: <strong>{(products.find((p) => p.id === adjustingId)?.quantity || 0) + Number(adjustQty)}</strong>
+            </p>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => handleAdjustSubmit(adjustingId)}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  background: '#059669',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => setAdjustingId(null)}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  background: '#6b7280',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {undoItem && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '96px',
+            right: '24px',
+            background: '#111827',
+            color: '#fff',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            boxShadow: '0 8px 20px rgba(0,0,0,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            zIndex: 1100
+          }}
+        >
+          <span style={{ fontSize: '14px' }}>
+            Product deleted. Restore?
+          </span>
+          <button
+            onClick={handleRestore}
+            style={{
+              background: '#2563eb',
+              border: 'none',
+              color: '#fff',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '13px'
+            }}
+          >
+            Undo
+          </button>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

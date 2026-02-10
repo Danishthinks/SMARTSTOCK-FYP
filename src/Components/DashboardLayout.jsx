@@ -4,7 +4,7 @@ import { useAuth } from '../Contexts/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import ThemeToggle from './ui/ThemeToggle';
-import { LayoutDashboard, PlusCircle, Package, FileText } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Package, FileText, Warehouse } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
   const { currentUser } = useAuth();
@@ -149,6 +149,40 @@ export default function DashboardLayout({ children }) {
         >
           <Package size={18} />
           Inventory List
+        </Link>
+
+        <Link
+          to="/dashboard/warehouses"
+          className="nav-link"
+          style={{
+            padding: '12px',
+            borderRadius: '8px',
+            color: isActive('/dashboard/warehouses') ? '#fff' : '#d1d5db',
+            textDecoration: 'none',
+            fontSize: '15px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            transition: '0.2s',
+            backgroundColor: isActive('/dashboard/warehouses') ? 'rgba(255,255,255,0.12)' : 'transparent'
+          }}
+          onMouseEnter={(e) => {
+            if (!isActive('/dashboard/warehouses')) {
+              e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)';
+              e.currentTarget.style.color = '#fff';
+              e.currentTarget.style.transform = 'translateX(3px)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isActive('/dashboard/warehouses')) {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = '#d1d5db';
+              e.currentTarget.style.transform = 'translateX(0)';
+            }
+          }}
+        >
+          <Warehouse size={18} />
+          Warehouses
         </Link>
 
         <Link

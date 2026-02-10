@@ -5,6 +5,7 @@ import Dashboard from "./Pages/Dashboard/Dashboard";
 import AddProduct from "./Pages/Dashboard/AddProduct";
 import InventoryList from "./Pages/Dashboard/InventoryList";
 import ActivityLogs from "./Pages/Dashboard/ActivityLogs";
+import Warehouses from "./Pages/Dashboard/Warehouses";
 import ProtectedRoute from "./Components/ProtectedRoute";
 import ChatbotWidget from "./Components/ui/ChatbotWidget";
 
@@ -35,6 +36,14 @@ function App() {
           element={
             <ProtectedRoute>
               <InventoryList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/warehouses"
+          element={
+            <ProtectedRoute>
+              <Warehouses />
             </ProtectedRoute>
           }
         />

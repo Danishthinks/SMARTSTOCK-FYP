@@ -1,6 +1,6 @@
 import React, { useState } from "react"
 import { Eye, EyeOff } from "lucide-react"
-import { signInWithEmailAndPassword } from "firebase/auth"
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth"
 import { auth } from "../../lib/firebase"
 import { useNavigate, Link } from "react-router-dom"
 import { useTheme } from "../../Components/ThemeContext"
@@ -11,6 +11,10 @@ export default function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState("")
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [forgotMessage, setForgotMessage] = useState("")
   const navigate = useNavigate()
   const { theme } = useTheme()
   
@@ -42,6 +46,32 @@ export default function LoginForm() {
       console.error("Login error:", err)
       setError(err.message || "Login failed. Please check your credentials.")
       setIsLoading(false)
+    }
+  }
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault()
+    setForgotMessage("")
+
+    if (!forgotEmail.trim()) {
+      setForgotMessage("Please enter your email address.")
+      return
+    }
+
+    setForgotLoading(true)
+
+    try {
+      await sendPasswordResetEmail(auth, forgotEmail.trim())
+      setForgotMessage("✅ Password reset email sent! Check your inbox.")
+      setForgotEmail("")
+      setTimeout(() => {
+        setShowForgotPassword(false)
+        setForgotMessage("")
+      }, 2000)
+    } catch (err) {
+      console.error("Password reset error:", err)
+      setForgotMessage("❌ " + (err.message || "Failed to send reset email"))
+      setForgotLoading(false)
     }
   }
 
@@ -103,6 +133,17 @@ export default function LoginForm() {
             </div>
           )}
 
+          {/* Forgot Password Link */}
+          <div className="mb-4 text-right">
+            <button
+              type="button"
+              onClick={() => setShowForgotPassword(true)}
+              className="text-xs text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:underline"
+            >
+              Forgot Password?
+            </button>
+          </div>
+
           {/* Login Button */}
           <button
             type="submit"
@@ -124,6 +165,66 @@ export default function LoginForm() {
         </div>
       </div>
     </div>
+
+    {/* Forgot Password Modal */}
+    {showForgotPassword && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div 
+          className="relative w-full max-w-sm rounded-xl p-8 text-slate-900 dark:bg-[#181a1f] dark:text-slate-100"
+          style={glassCardStyle}
+        >
+          <h3 className="mb-2 text-2xl font-bold text-black dark:text-slate-100">
+            Reset Password
+          </h3>
+          <p className="mb-6 text-sm text-slate-600 dark:text-slate-400">
+            Enter your email address and we'll send you a password reset link.
+          </p>
+
+          <form onSubmit={handleForgotPassword}>
+            <input
+              type="email"
+              placeholder="Email Address"
+              value={forgotEmail}
+              onChange={(e) => setForgotEmail(e.target.value)}
+              className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-black focus:ring-2 focus:ring-black dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-slate-400 dark:focus:ring-slate-400"
+              style={glassInputStyle}
+              required
+            />
+
+            {forgotMessage && (
+              <div className={`mb-4 rounded-lg p-3 text-sm ${
+                forgotMessage.includes("✅")
+                  ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200"
+                  : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200"
+              }`}>
+                {forgotMessage}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                disabled={forgotLoading}
+                className="flex-1 rounded-lg bg-black dark:bg-white py-3 text-sm font-medium text-white dark:text-black transition hover:bg-gray-800 dark:hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {forgotLoading ? "Sending..." : "Send Reset Link"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForgotPassword(false)
+                  setForgotMessage("")
+                  setForgotEmail("")
+                }}
+                className="flex-1 rounded-lg border border-slate-300 bg-white py-3 text-sm font-medium text-slate-900 transition hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
     </>
   )
 }
