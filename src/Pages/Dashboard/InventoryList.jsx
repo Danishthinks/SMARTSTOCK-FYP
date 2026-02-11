@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../../Components/DashboardLayout';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { db, auth } from '../../lib/firebase';
 import { addLog } from '../../lib/firebase-logs';
 import { addProductIdsToExistingProducts } from '../../lib/update-product-ids';
 import { pushNotification, sendCrudNotification } from '../../lib/notifications';
@@ -19,6 +19,12 @@ export default function InventoryList() {
   const [adjustQty, setAdjustQty] = useState(0);
   const [undoItem, setUndoItem] = useState(null);
   const [undoTimer, setUndoTimer] = useState(null);
+  const [message, setMessage] = useState({ text: '', type: '' });
+
+  const showMessage = (text, type = 'warning') => {
+    setMessage({ text, type });
+    setTimeout(() => setMessage({ text: '', type: '' }), 5000);
+  };
 
   useEffect(() => {
     if (!db) {
@@ -132,7 +138,10 @@ export default function InventoryList() {
   const handleEditSubmit = async (id) => {
     try {
       const product = products.find((p) => p.id === id);
-      await updateDoc(doc(db, 'products', id), editFormData);
+      await updateDoc(doc(db, 'products', id), {
+        ...editFormData,
+        lastUpdatedBy: auth?.currentUser?.uid || null
+      });
       addLog('UPDATE PRODUCT', editFormData.name, product?.quantity || 0);
       pushNotification('Product updated', {
         body: `${editFormData.name || product?.name || 'Product'} updated.`
@@ -163,7 +172,10 @@ export default function InventoryList() {
     try {
       const product = products.find((p) => p.id === id);
       const newQuantity = Math.max(0, (product.quantity || 0) + Number(adjustQty));
-      await updateDoc(doc(db, 'products', id), { quantity: newQuantity });
+      await updateDoc(doc(db, 'products', id), {
+        quantity: newQuantity,
+        lastUpdatedBy: auth?.currentUser?.uid || null
+      });
       addLog('STOCK ADJUST', product.name, newQuantity);
       pushNotification('Stock adjusted', {
         body: `${product.name}: ${product.quantity || 0} → ${newQuantity}`
@@ -172,6 +184,9 @@ export default function InventoryList() {
         title: 'Stock adjusted',
         body: `${product.name}: ${product.quantity || 0} → ${newQuantity}`
       });
+      if (newQuantity < 5) {
+        showMessage(`Low stock: ${product.name} is now at ${newQuantity}`, 'warning');
+      }
       setAdjustingId(null);
       setAdjustQty(0);
       alert('Stock adjusted successfully');
@@ -188,7 +203,8 @@ export default function InventoryList() {
       const { id, ...data } = undoItem;
       await setDoc(doc(db, 'products', id), {
         ...data,
-        restoredAt: serverTimestamp()
+        restoredAt: serverTimestamp(),
+        lastUpdatedBy: auth?.currentUser?.uid || null
       }, { merge: true });
 
       addLog('RESTORE PRODUCT', data.name || 'Product', data.quantity || 0);
@@ -391,6 +407,22 @@ export default function InventoryList() {
           </button>
         </div>
       </div>
+
+      {message.text && (
+        <div
+          style={{
+            backgroundColor: message.type === 'success' ? '#0a7b0015' : '#9B870C15',
+            color: message.type === 'success' ? '#0a7b00' : '#9B870C',
+            padding: '10px 12px',
+            borderRadius: '6px',
+            marginBottom: '16px',
+            fontSize: '13px',
+            border: `1px solid ${message.type === 'success' ? '#0a7b0030' : '#9B870C30'}`
+          }}
+        >
+          {message.text}
+        </div>
+      )}
 
       <div
         style={{

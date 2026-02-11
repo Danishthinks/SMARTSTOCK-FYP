@@ -250,7 +250,8 @@ export default function Warehouses() {
     try {
       await updateDoc(doc(db, 'products', productId), {
         warehouse: toWarehouse,
-        quantity: qtyNum
+        quantity: qtyNum,
+        lastUpdatedBy: auth?.currentUser?.uid || null
       });
 
       addLog('TRANSFER STOCK', `${product.name} from ${fromWarehouse} to ${toWarehouse}`, qtyNum);
@@ -1109,7 +1110,8 @@ export default function Warehouses() {
 
                               try {
                                 await updateDoc(doc(db, 'products', product.id), {
-                                  warehouse: warehouseName
+                                  warehouse: warehouseName,
+                                  lastUpdatedBy: auth?.currentUser?.uid || null
                                 });
 
                                 addLog('ASSIGN WAREHOUSE', `${product.name} to ${warehouseName}`, product.quantity);

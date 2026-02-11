@@ -104,7 +104,8 @@ export default function AddProduct() {
         sellingPrice: sellNum,
         warehouse: warehouse.trim(),
         createdAt: serverTimestamp(),
-        createdBy: auth.currentUser.uid
+        createdBy: auth.currentUser.uid,
+        lastUpdatedBy: auth.currentUser.uid
       });
 
       // Log the action

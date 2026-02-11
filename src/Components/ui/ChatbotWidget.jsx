@@ -130,9 +130,9 @@ export default function ChatbotWidget() {
     }
 
     const isProductQuery =
-      /quantity|stock|how many|available|in stock|price|buy|sell|purchase|info|specifications|specs/i.test(query);
+      /quantity|stock|how many|available|in stock|price|buy|sell|purchase|info|specifications|specs|category|product|item|inventory status/i.test(query);
 
-    if (!isProductQuery || products.length === 0) return null;
+    if (products.length === 0) return null;
 
     const byName = products.filter((p) =>
       normalizeText(p.name) && query.includes(normalizeText(p.name))
@@ -145,6 +145,10 @@ export default function ChatbotWidget() {
     const byProductId = products.filter((p) =>
       normalizeText(p.productId) && query.includes(normalizeText(p.productId))
     );
+
+    const hasAnyMatch = byName.length > 0 || byCategory.length > 0 || byProductId.length > 0;
+
+    if (!isProductQuery && !hasAnyMatch) return null;
 
     let matches = byName.length > 0 ? byName : byProductId;
     if (matches.length && byCategory.length) {
