@@ -19,6 +19,8 @@ export default function AddProduct() {
   const [message, setMessage] = useState({ text: '', type: '' });
   const [warehouses, setWarehouses] = useState([]);
 
+  const round2 = (num) => Math.round(Number(num || 0) * 100) / 100;
+
   // Fetch warehouses
   useEffect(() => {
     if (!db) return;
@@ -66,8 +68,8 @@ export default function AddProduct() {
     }
 
     const qtyNum = Number(quantity);
-    const priceNum = Number(purchasePrice);
-    const sellNum = Number(sellingPrice);
+    const priceNum = round2(purchasePrice);
+    const sellNum = round2(sellingPrice);
 
     if (qtyNum < 0 || !Number.isInteger(qtyNum)) {
       showMessage('⚠️ Quantity must be a positive whole number', 'warning');

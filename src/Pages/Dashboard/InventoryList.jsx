@@ -21,6 +21,8 @@ export default function InventoryList() {
   const [undoTimer, setUndoTimer] = useState(null);
   const [message, setMessage] = useState({ text: '', type: '' });
 
+  const round2 = (num) => Math.round(Number(num || 0) * 100) / 100;
+
   const showMessage = (text, type = 'warning') => {
     setMessage({ text, type });
     setTimeout(() => setMessage({ text: '', type: '' }), 5000);
@@ -140,6 +142,8 @@ export default function InventoryList() {
       const product = products.find((p) => p.id === id);
       await updateDoc(doc(db, 'products', id), {
         ...editFormData,
+        purchasePrice: round2(editFormData.purchasePrice),
+        sellingPrice: round2(editFormData.sellingPrice),
         lastUpdatedBy: auth?.currentUser?.uid || null
       });
       addLog('UPDATE PRODUCT', editFormData.name, product?.quantity || 0);

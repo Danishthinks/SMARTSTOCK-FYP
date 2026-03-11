@@ -18,6 +18,14 @@ export default function ChatbotWidget() {
   ]);
   const messagesEndRef = useRef(null);
 
+  const formatCurrency = (value) =>
+    new Intl.NumberFormat("en-PK", {
+      style: "currency",
+      currency: "PKR",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value || 0);
+
   const apiKey = useMemo(
     () => process.env.REACT_APP_GROQ_API_KEY || "",
     []
@@ -69,6 +77,9 @@ export default function ChatbotWidget() {
   const normalizeText = (value) =>
     (value || "").toString().trim().toLowerCase();
 
+  const isInventoryIntent = (text) =>
+    /inventory|stock|product|warehouse|qty|quantity|price|selling|purchase|restock|low stock|item|catalog|sku|product id/i.test(text || "");
+
   const getInventoryAnswer = (text) => {
     const query = normalizeText(text);
     if (!query) return null;
@@ -102,7 +113,7 @@ export default function ChatbotWidget() {
         response += `\nInventory Summary:\n`;
         response += `• Products: ${whProducts.length}\n`;
         response += `• Total Quantity: ${totalQty}\n`;
-        response += `• Total Value: Rs. ${totalValue.toLocaleString()}\n`;
+        response += `• Total Value: ${formatCurrency(totalValue)}\n`;
         
         if (whProducts.length > 0) {
           response += `\nProducts:\n`;
@@ -165,8 +176,8 @@ export default function ChatbotWidget() {
       if (item.name) details.push(`Name: ${item.name}`);
       if (item.category) details.push(`Category: ${item.category}`);
       if (item.quantity != null) details.push(`Quantity: ${item.quantity}`);
-      if (item.purchasePrice != null) details.push(`Purchase Price: $${item.purchasePrice}`);
-      if (item.sellingPrice != null) details.push(`Selling Price: $${item.sellingPrice}`);
+      if (item.purchasePrice != null) details.push(`Purchase Price: ${formatCurrency(item.purchasePrice)}`);
+      if (item.sellingPrice != null) details.push(`Selling Price: ${formatCurrency(item.sellingPrice)}`);
       if (item.warehouse) details.push(`Warehouse: ${item.warehouse}`);
       
       return details.join("\n");
@@ -175,7 +186,7 @@ export default function ChatbotWidget() {
     if (matches.length > 1) {
       const list = matches
         .slice(0, 5)
-        .map((p) => `${p.name} (Qty: ${p.quantity ?? 0}, Price: $${p.sellingPrice ?? 0})`)
+        .map((p) => `${p.name} (Qty: ${p.quantity ?? 0}, Price: ${formatCurrency(p.sellingPrice ?? 0)})`)
         .join("\n");
       return `I found multiple matches:\n${list}\n\nPlease specify the exact product name.`;
     }
@@ -188,7 +199,7 @@ export default function ChatbotWidget() {
       const categoryName = byCategory[0]?.category || "that category";
       const items = byCategory
         .slice(0, 5)
-        .map((p) => `• ${p.name}: Qty ${p.quantity ?? 0}, Price $${p.sellingPrice ?? 0}`)
+        .map((p) => `• ${p.name}: Qty ${p.quantity ?? 0}, Price ${formatCurrency(p.sellingPrice ?? 0)}`)
         .join("\n");
       return `Total quantity in ${categoryName}: ${total}\n\nProducts:\n${items}`;
     }
@@ -219,11 +230,17 @@ export default function ChatbotWidget() {
         return;
       }
 
-      const inventoryContext = `Current Inventory: ${products.length} products across ${warehouses.length} warehouses. Total stock value: Rs. ${products.reduce((sum, p) => sum + ((p.purchasePrice || 0) * (p.quantity || 0)), 0).toLocaleString()}.`;
+      if (!isInventoryIntent(trimmed)) {
+        setMessages((prev) => [...prev, { role: "assistant", content: "I’m focused on SmartStock inventory, products, pricing, and warehouses. Please ask an inventory-related question." }]);
+        setIsLoading(false);
+        return;
+      }
+
+      const inventoryContext = `Current Inventory: ${products.length} products across ${warehouses.length} warehouses. Total stock value: ${formatCurrency(products.reduce((sum, p) => sum + ((p.purchasePrice || 0) * (p.quantity || 0)), 0))}.`;
 
       const systemMessage = {
         role: "system",
-        content: `You are SmartStock AI, a helpful inventory assistant. Be direct and conversational. Answer questions immediately with available data. Never ask for credentials or unnecessary details - just provide the information the user needs. ${inventoryContext} If asked about specific products, warehouses, or stock levels, give clear, concise answers without requesting additional information.`
+        content: `You are SmartStock AI, a strict inventory assistant. Answer ONLY inventory, stock, product, price, or warehouse questions. If a question is off-topic, politely refuse and say you only handle inventory. Be concise and direct. Never invent data. Use this context: ${inventoryContext}`
       };
 
       const response = await fetch(
