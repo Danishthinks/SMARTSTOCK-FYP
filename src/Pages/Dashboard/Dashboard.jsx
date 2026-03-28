@@ -36,6 +36,7 @@ export default function Dashboard() {
   const [actionStackChart, setActionStackChart] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [restockSuggestions, setRestockSuggestions] = useState([]);
 
   const palette = ['#4f46e5', '#22c55e', '#f97316', '#0ea5e9', '#e11d48', '#a855f7', '#14b8a6', '#f59e0b'];
   const actionColors = {
@@ -43,6 +44,7 @@ export default function Dashboard() {
     'UPDATE PRODUCT': '#0ea5e9',
     'DELETE PRODUCT': '#e11d48',
     'STOCK ADJUST': '#f59e0b',
+    'RECORD SALE': '#16a34a',
     'TRANSFER STOCK': '#8b5cf6',
     OTHER: '#6b7280'
   };
@@ -98,7 +100,8 @@ export default function Dashboard() {
 
           snapshot.forEach((doc) => {
             const data = doc.data();
-            if (data && data.quantity != null && data.quantity < 5) {
+            const productThresh = data?.threshold != null ? data.threshold : 5;
+            if (data && data.quantity != null && data.quantity < productThresh) {
               lowCount++;
               restockCount++;
             }
@@ -272,7 +275,7 @@ export default function Dashboard() {
           ]
         });
 
-        const actionKeys = ['ADD PRODUCT', 'UPDATE PRODUCT', 'DELETE PRODUCT', 'STOCK ADJUST', 'TRANSFER STOCK', 'OTHER'];
+        const actionKeys = ['ADD PRODUCT', 'UPDATE PRODUCT', 'DELETE PRODUCT', 'STOCK ADJUST', 'RECORD SALE', 'TRANSFER STOCK', 'OTHER'];
         const actionDatasets = actionKeys.map((action) => ({
           label: action,
           data: days.map((day) => actionDailyMap.get(`${day}:${action}`) || 0),
@@ -291,6 +294,57 @@ export default function Dashboard() {
     } catch (e) {
       console.error('Logs error:', e);
     }
+  }, [currentUser]);
+
+  // AI restock trend analysis from last 90 days of logs
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 90);
+
+    const trendQuery = query(
+      collection(db, 'logs'),
+      orderBy('timestamp', 'desc'),
+      limit(300)
+    );
+
+    const unsubTrend = onSnapshot(trendQuery, (snapshot) => {
+      const productActivity = new Map();
+      const monthlyActivity = new Map();
+
+      snapshot.forEach((doc) => {
+        const log = doc.data();
+        const ts = log.timestamp?.toDate ? log.timestamp.toDate() : null;
+        if (!ts || ts < cutoffDate || !log.productName) return;
+
+        const pName = log.productName;
+        productActivity.set(pName, (productActivity.get(pName) || 0) + 1);
+
+        const monthKey = `${pName}:${ts.getFullYear()}-${String(ts.getMonth() + 1).padStart(2, '0')}`;
+        monthlyActivity.set(monthKey, (monthlyActivity.get(monthKey) || 0) + 1);
+      });
+
+      const now = new Date();
+      const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const prevDate = new Date(now);
+      prevDate.setMonth(prevDate.getMonth() - 1);
+      const lastMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+
+      const suggestions = Array.from(productActivity.entries())
+        .map(([name, totalCount]) => {
+          const thisM = monthlyActivity.get(`${name}:${thisMonth}`) || 0;
+          const lastM = monthlyActivity.get(`${name}:${lastMonth}`) || 0;
+          const trend = thisM > lastM ? 'up' : thisM < lastM ? 'down' : 'stable';
+          return { name, totalCount, thisM, lastM, trend };
+        })
+        .sort((a, b) => b.totalCount - a.totalCount)
+        .slice(0, 6);
+
+      setRestockSuggestions(suggestions);
+    }, () => {});
+
+    return () => unsubTrend();
   }, [currentUser]);
 
   const baseChartOptions = {
@@ -798,6 +852,72 @@ export default function Dashboard() {
             )}
           </ul>
         </div>
+
+        {/* AI Restock Predictions */}
+        {restockSuggestions.length > 0 && (
+          <div
+            style={{
+              backgroundColor: 'var(--card)',
+              marginTop: '25px',
+              padding: '20px',
+              borderRadius: '12px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '20px' }}>🤖</span>
+              <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--text-dark)', fontWeight: 600 }}>
+                AI Restock Predictions
+              </h3>
+              <span style={{ fontSize: '11px', color: '#6b7280', background: '#f1f5f9', padding: '2px 10px', borderRadius: '999px' }}>
+                Based on 90-day activity trend
+              </span>
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))',
+                gap: '12px'
+              }}
+            >
+              {restockSuggestions.map((item, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(168,85,247,0.07), rgba(79,70,229,0.05))',
+                    borderRadius: '10px',
+                    padding: '14px',
+                    border: '1px solid rgba(168,85,247,0.15)'
+                  }}
+                >
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '6px' }}>
+                    {item.name}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
+                    {item.totalCount} log events in 90d
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '16px' }}>
+                      {item.trend === 'up' ? '📈' : item.trend === 'down' ? '📉' : '➡️'}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        color: item.trend === 'up' ? '#16a34a' : item.trend === 'down' ? '#dc2626' : '#6b7280'
+                      }}
+                    >
+                      {item.trend === 'up' ? 'Rising demand' : item.trend === 'down' ? 'Declining' : 'Stable'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+                    This month: {item.thisM}&nbsp;|&nbsp;Last: {item.lastM}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
     </DashboardLayout>
   );
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import DashboardLayout from '../../Components/DashboardLayout';
 import { collection, onSnapshot, query, orderBy, addDoc, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
@@ -7,6 +8,7 @@ import { pushNotification, sendCrudNotification } from '../../lib/notifications'
 import { Warehouse, Plus, Edit2, Trash2, Send, ArrowRight, Package, X } from 'lucide-react';
 
 export default function Warehouses() {
+  const location = useLocation();
   const [warehouses, setWarehouses] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +36,12 @@ export default function Warehouses() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWarehouse, setSelectedWarehouse] = useState(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const queryValue = params.get('q') || '';
+    setSearchTerm(queryValue);
+  }, [location.search]);
 
   // Fetch warehouses
   useEffect(() => {

@@ -189,6 +189,7 @@ export default function ActivityLogs() {
           <option value="DELETE PRODUCT">DELETE PRODUCT</option>
           <option value="STOCK ADJUST">STOCK ADJUST</option>
           <option value="UPDATE PRODUCT">UPDATE PRODUCT</option>
+          <option value="RECORD SALE">RECORD SALE</option>
         </select>
         <button
           onClick={exportToCSV}

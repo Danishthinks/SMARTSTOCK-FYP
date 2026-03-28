@@ -13,7 +13,10 @@ export default function AddProduct() {
     quantity: '',
     purchasePrice: '',
     sellingPrice: '',
-    warehouse: ''
+    warehouse: '',
+    vendorName: '',
+    vendorEmail: '',
+    threshold: 5
   });
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
@@ -105,6 +108,9 @@ export default function AddProduct() {
         purchasePrice: priceNum,
         sellingPrice: sellNum,
         warehouse: warehouse.trim(),
+        vendorName: formData.vendorName.trim(),
+        vendorEmail: formData.vendorEmail.trim(),
+        threshold: Number(formData.threshold) > 0 ? Number(formData.threshold) : 5,
         createdAt: serverTimestamp(),
         createdBy: auth.currentUser.uid,
         lastUpdatedBy: auth.currentUser.uid
@@ -129,7 +135,10 @@ export default function AddProduct() {
         quantity: '',
         purchasePrice: '',
         sellingPrice: '',
-        warehouse: ''
+        warehouse: '',
+        vendorName: '',
+        vendorEmail: '',
+        threshold: 5
       });
     } catch (err) {
       console.error('Error adding product:', err);
@@ -337,6 +346,93 @@ export default function AddProduct() {
                 📍 No warehouses found. Create one in Warehouses section first.
               </small>
             )}
+          </div>
+
+          <div style={{ marginBottom: '0', paddingTop: '10px', borderTop: '1px solid #e5e7eb' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Vendor Info (optional)
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-dark)', display: 'block', marginBottom: '5px' }}>
+              Vendor Name
+            </label>
+            <input
+              type="text"
+              name="vendorName"
+              placeholder="e.g. Ali Traders"
+              maxLength="100"
+              value={formData.vendorName}
+              onChange={handleChange}
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '1px solid #ccc',
+                borderRadius: '6px',
+                marginTop: '5px',
+                fontSize: '14px',
+                backgroundColor: 'var(--card)',
+                color: 'var(--text-dark)'
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-dark)', display: 'block', marginBottom: '5px' }}>
+              Vendor Email
+              <span style={{ fontSize: '11px', fontWeight: 400, color: '#6b7280', marginLeft: '6px' }}>auto-emailed when stock goes low</span>
+            </label>
+            <input
+              type="email"
+              name="vendorEmail"
+              placeholder="e.g. vendor@example.com"
+              maxLength="150"
+              value={formData.vendorEmail}
+              onChange={handleChange}
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '1px solid #ccc',
+                borderRadius: '6px',
+                marginTop: '5px',
+                fontSize: '14px',
+                backgroundColor: 'var(--card)',
+                color: 'var(--text-dark)'
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '0', paddingTop: '10px', borderTop: '1px solid #e5e7eb' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Low Stock Settings
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-dark)', display: 'block', marginBottom: '5px' }}>
+              Low Stock Threshold
+              <span style={{ fontSize: '11px', fontWeight: 400, color: '#6b7280', marginLeft: '6px' }}>alert &amp; vendor email fires when qty drops below this</span>
+            </label>
+            <input
+              type="number"
+              name="threshold"
+              min="1"
+              max="10000"
+              placeholder="e.g. 5"
+              value={formData.threshold}
+              onChange={handleChange}
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '1px solid #ccc',
+                borderRadius: '6px',
+                marginTop: '5px',
+                fontSize: '14px',
+                backgroundColor: 'var(--card)',
+                color: 'var(--text-dark)'
+              }}
+            />
           </div>
 
           <button

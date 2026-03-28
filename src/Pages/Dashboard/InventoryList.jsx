@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import DashboardLayout from '../../Components/DashboardLayout';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
@@ -7,6 +8,7 @@ import { addProductIdsToExistingProducts } from '../../lib/update-product-ids';
 import { pushNotification, sendCrudNotification } from '../../lib/notifications';
 
 export default function InventoryList() {
+  const location = useLocation();
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,6 +29,12 @@ export default function InventoryList() {
     setMessage({ text, type });
     setTimeout(() => setMessage({ text: '', type: '' }), 5000);
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const queryValue = params.get('q') || '';
+    setSearchTerm(queryValue);
+  }, [location.search]);
 
   useEffect(() => {
     if (!db) {
@@ -133,7 +141,10 @@ export default function InventoryList() {
       name: product.name,
       category: product.category,
       purchasePrice: product.purchasePrice,
-      sellingPrice: product.sellingPrice
+      sellingPrice: product.sellingPrice,
+      vendorName: product.vendorName || '',
+      vendorEmail: product.vendorEmail || '',
+      threshold: product.threshold != null ? product.threshold : 5
     });
   };
 
@@ -188,8 +199,9 @@ export default function InventoryList() {
         title: 'Stock adjusted',
         body: `${product.name}: ${product.quantity || 0} → ${newQuantity}`
       });
-      if (newQuantity < 5) {
-        showMessage(`Low stock: ${product.name} is now at ${newQuantity}`, 'warning');
+      const thresh = product.threshold != null ? product.threshold : 5;
+      if (newQuantity < thresh) {
+        showMessage(`Low stock: ${product.name} is now at ${newQuantity} (threshold: ${thresh})`, 'warning');
       }
       setAdjustingId(null);
       setAdjustQty(0);
@@ -484,7 +496,8 @@ export default function InventoryList() {
             ) : (
               filteredProducts.map((product) => {
                 const quantity = product.quantity != null ? product.quantity : 0;
-                const isLowStock = quantity < 5;
+                const productThreshold = product.threshold != null ? product.threshold : 5;
+                const isLowStock = quantity < productThreshold;
                 return (
                   <tr
                     key={product.id}
@@ -692,6 +705,86 @@ export default function InventoryList() {
                   width: '100%',
                   padding: '10px',
                   border: '1px solid #ccc',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  backgroundColor: 'var(--card)',
+                  color: 'var(--text-dark)',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '0', paddingTop: '8px', borderTop: '1px solid #e5e7eb', marginBottom: '12px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Vendor Info</div>
+            </div>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-dark)', display: 'block', marginBottom: '5px' }}>
+                Vendor Name
+              </label>
+              <input
+                type="text"
+                value={editFormData.vendorName || ''}
+                onChange={(e) => setEditFormData({ ...editFormData, vendorName: e.target.value })}
+                placeholder="e.g. Ali Traders"
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid #ccc',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  backgroundColor: 'var(--card)',
+                  color: 'var(--text-dark)',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-dark)', display: 'block', marginBottom: '5px' }}>
+                Vendor Email
+                <span style={{ fontSize: '11px', fontWeight: 400, color: '#6b7280', marginLeft: '6px' }}>auto-emailed on low stock</span>
+              </label>
+              <input
+                type="email"
+                value={editFormData.vendorEmail || ''}
+                onChange={(e) => setEditFormData({ ...editFormData, vendorEmail: e.target.value })}
+                placeholder="e.g. vendor@example.com"
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid #ccc',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  backgroundColor: 'var(--card)',
+                  color: 'var(--text-dark)',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '0', paddingTop: '10px', borderTop: '1px solid #e5e7eb' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Low Stock Settings
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-dark)', display: 'block', marginBottom: '5px' }}>
+                Low Stock Threshold
+                <span style={{ fontSize: '11px', fontWeight: 400, color: '#6b7280', marginLeft: '6px' }}>alert &amp; vendor email fires below this qty</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="10000"
+                value={editFormData.threshold != null ? editFormData.threshold : 5}
+                onChange={(e) => setEditFormData({ ...editFormData, threshold: Number(e.target.value) || 1 })}
+                placeholder="e.g. 5"
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '2px solid #f59e0b',
                   borderRadius: '6px',
                   fontSize: '14px',
                   backgroundColor: 'var(--card)',

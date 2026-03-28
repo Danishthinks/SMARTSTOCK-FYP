@@ -32,7 +32,7 @@ function getMailer() {
   return cachedTransporter;
 }
 
-function buildLowStockMessage(product) {
+function buildLowStockMessage(product, threshold) {
   const name = product?.name || "Product";
   const productId = product?.productId ? ` (${product.productId})` : "";
   const warehouse = product?.warehouse || "Unassigned";
@@ -42,13 +42,13 @@ function buildLowStockMessage(product) {
     `Low stock alert for ${name}${productId}\n` +
     `Quantity: ${quantity}\n` +
     `Warehouse: ${warehouse}\n` +
-    `Threshold: ${LOW_STOCK_THRESHOLD}`;
+    `Threshold: ${threshold}`;
   const html = `
     <p><strong>Low stock alert</strong></p>
     <p>Product: ${name}${productId}</p>
     <p>Quantity: ${quantity}</p>
     <p>Warehouse: ${warehouse}</p>
-    <p>Threshold: ${LOW_STOCK_THRESHOLD}</p>
+    <p>Threshold: ${threshold}</p>
   `;
 
   return { subject, text, html };
@@ -142,10 +142,11 @@ exports.notifyLowStockEmail = functions.firestore
     const before = change.before.exists ? change.before.data() : null;
     const afterQty = Number(after.quantity ?? 0);
     const beforeQty = Number(before?.quantity ?? Number.POSITIVE_INFINITY);
+    const productThreshold = Number(after.threshold ?? LOW_STOCK_THRESHOLD);
 
     const crossedThreshold =
-      afterQty < LOW_STOCK_THRESHOLD &&
-      (before == null || beforeQty >= LOW_STOCK_THRESHOLD);
+      afterQty < productThreshold &&
+      (before == null || beforeQty >= productThreshold);
 
     if (!crossedThreshold) {
       return null;
@@ -176,7 +177,7 @@ exports.notifyLowStockEmail = functions.firestore
       return null;
     }
 
-    const { subject, text, html } = buildLowStockMessage(after);
+    const { subject, text, html } = buildLowStockMessage(after, productThreshold);
     const from = process.env.SMTP_FROM || process.env.SMTP_USER;
 
     try {
@@ -187,6 +188,44 @@ exports.notifyLowStockEmail = functions.firestore
         text,
         html
       });
+
+      // Send restock request to vendor if their email is stored on the product
+      if (after.vendorEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(after.vendorEmail)) {
+        const vendorName = after.vendorName || "Valued Vendor";
+        const vendorSubject = `Restock Request: ${name}${productId}`;
+        const vendorTextBody =
+          `Dear ${vendorName},\n\n` +
+          `We are reaching out to request a restock for the following product:\n\n` +
+          `Product: ${name}${productId}\n` +
+          `Current Stock: ${quantity} units\n` +
+          `Warehouse: ${warehouse}\n` +
+          `Restock Threshold: ${productThreshold} units\n\n` +
+          `Please contact us at your earliest convenience to arrange resupply.\n\n` +
+          `Thank you,\nSmartStock Team`;
+        const vendorHtml = `
+          <p>Dear <strong>${vendorName}</strong>,</p>
+          <p>We are reaching out to request a restock for the following product:</p>
+          <table style="border-collapse:collapse;margin:12px 0;">
+            <tr><td style="padding:4px 16px 4px 0;font-weight:bold;color:#374151;">Product:</td><td>${name}${productId}</td></tr>
+            <tr><td style="padding:4px 16px 4px 0;font-weight:bold;color:#374151;">Current Stock:</td><td style="color:#dc2626;font-weight:bold;">${quantity} units</td></tr>
+            <tr><td style="padding:4px 16px 4px 0;font-weight:bold;color:#374151;">Warehouse:</td><td>${warehouse}</td></tr>
+            <tr><td style="padding:4px 16px 4px 0;font-weight:bold;color:#374151;">Restock Threshold:</td><td>${productThreshold} units</td></tr>
+          </table>
+          <p>Please contact us at your earliest convenience to arrange resupply.</p>
+          <p>Thank you,<br/><strong>SmartStock Team</strong></p>
+        `;
+        try {
+          await transporter.sendMail({
+            from,
+            to: after.vendorEmail,
+            subject: vendorSubject,
+            text: vendorTextBody,
+            html: vendorHtml
+          });
+        } catch (vendorErr) {
+          console.error("Vendor restock email failed:", vendorErr);
+        }
+      }
     } catch (err) {
       console.error("Low stock email: send failed", err);
     }
