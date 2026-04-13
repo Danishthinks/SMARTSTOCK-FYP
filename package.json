@@ -10,6 +10,8 @@
     "@tsparticles/engine": "^3.9.1",
     "@tsparticles/react": "^3.0.0",
     "@tsparticles/slim": "^3.9.1",
+    "@zxing/browser": "^0.1.5",
+    "@zxing/library": "^0.21.3",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
     "firebase": "^12.6.0",

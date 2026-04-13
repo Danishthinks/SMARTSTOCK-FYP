@@ -3,7 +3,7 @@ import DashboardLayout from '../../Components/DashboardLayout';
 import { auth, db } from '../../lib/firebase';
 import { addLog } from '../../lib/firebase-logs';
 import { pushNotification, sendCrudNotification } from '../../lib/notifications';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import {
   collection,
   doc,
@@ -24,6 +24,21 @@ const formatCurrency = (value) =>
 
 const round2 = (num) => Math.round(Number(num || 0) * 100) / 100;
 const SCANNER_ELEMENT_ID = 'smartstock-barcode-scanner';
+const BARCODE_FORMATS = [
+  Html5QrcodeSupportedFormats.QR_CODE,
+  Html5QrcodeSupportedFormats.CODE_128,
+  Html5QrcodeSupportedFormats.CODE_39,
+  Html5QrcodeSupportedFormats.CODE_93,
+  Html5QrcodeSupportedFormats.EAN_13,
+  Html5QrcodeSupportedFormats.EAN_8,
+  Html5QrcodeSupportedFormats.UPC_A,
+  Html5QrcodeSupportedFormats.UPC_E,
+  Html5QrcodeSupportedFormats.ITF,
+  Html5QrcodeSupportedFormats.CODABAR,
+  Html5QrcodeSupportedFormats.DATA_MATRIX,
+  Html5QrcodeSupportedFormats.PDF_417,
+  Html5QrcodeSupportedFormats.AZTEC
+];
 
 export default function POS() {
   const [products, setProducts] = useState([]);
@@ -227,9 +242,10 @@ export default function POS() {
           { facingMode: 'environment' },
           {
             fps: 10,
-            qrbox: { width: 260, height: 120 },
-            aspectRatio: 1.777,
+            qrbox: { width: 300, height: 220 },
+            aspectRatio: 1.333,
             disableFlip: false,
+            formatsToSupport: BARCODE_FORMATS,
             experimentalFeatures: {
               useBarCodeDetectorIfSupported: true
             }

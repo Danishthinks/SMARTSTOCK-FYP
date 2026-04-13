@@ -140,6 +140,7 @@ export default function InventoryList() {
     setEditFormData({
       name: product.name,
       category: product.category,
+      ptaStatus: product.ptaStatus || '',
       purchasePrice: product.purchasePrice,
       sellingPrice: product.sellingPrice,
       vendorName: product.vendorName || '',
@@ -153,6 +154,7 @@ export default function InventoryList() {
       const product = products.find((p) => p.id === id);
       await updateDoc(doc(db, 'products', id), {
         ...editFormData,
+        ptaStatus: String(editFormData.category || '').trim().toLowerCase().includes('mobile') ? (editFormData.ptaStatus || '') : '',
         purchasePrice: round2(editFormData.purchasePrice),
         sellingPrice: round2(editFormData.sellingPrice),
         lastUpdatedBy: auth?.currentUser?.uid || null
@@ -247,7 +249,7 @@ export default function InventoryList() {
       return;
     }
 
-    const headers = ['Product ID', 'Name', 'Category', 'Warehouse', 'Quantity', 'Purchase Price', 'Selling Price'];
+    const headers = ['Product ID', 'Name', 'Category', 'PTA Status', 'Warehouse', 'Quantity', 'Purchase Price', 'Selling Price'];
     let csv = headers.join(',') + '\n';
 
     filteredProducts.forEach((p) => {
@@ -255,6 +257,7 @@ export default function InventoryList() {
         `"${(p.productId || '').replace(/"/g, '""')}"`,
         `"${(p.name || '').replace(/"/g, '""')}"`,
         `"${(p.category || '').replace(/"/g, '""')}"`,
+        `"${(p.ptaStatus || '').replace(/"/g, '""')}"`,
         `"${(p.warehouse || 'Not assigned').replace(/"/g, '""')}"`,
         p.quantity ?? '',
         p.purchasePrice ?? '',
@@ -296,7 +299,7 @@ export default function InventoryList() {
     y += 15;
 
     pdf.setFontSize(10);
-    const headers = ['ID', 'Name', 'Category', 'Warehouse', 'Qty', 'Buy Price', 'Sell Price'];
+    const headers = ['ID', 'Name', 'Category', 'PTA', 'Warehouse', 'Qty', 'Buy Price', 'Sell Price'];
     const colWidth = (pageWidth - 2 * margin) / headers.length;
 
     headers.forEach((h, i) => {
@@ -315,6 +318,7 @@ export default function InventoryList() {
         p.productId || '',
         p.name || '',
         p.category || '',
+        p.ptaStatus || '',
         p.warehouse || 'Not assigned',
         String(p.quantity ?? ''),
         String(p.purchasePrice ?? ''),
@@ -464,6 +468,9 @@ export default function InventoryList() {
                 Category
               </th>
               <th style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#111' }}>
+                PTA Status
+              </th>
+              <th style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#111' }}>
                 Warehouse
               </th>
               <th style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#111' }}>
@@ -483,13 +490,13 @@ export default function InventoryList() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="8" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                <td colSpan="9" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
                   Loading products...
                 </td>
               </tr>
             ) : filteredProducts.length === 0 ? (
               <tr>
-                <td colSpan="8" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                <td colSpan="9" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
                   No products found
                 </td>
               </tr>
@@ -513,6 +520,24 @@ export default function InventoryList() {
                     </td>
                     <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontSize: '14px' }}>
                       {product.category || ''}
+                    </td>
+                    <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontSize: '14px' }}>
+                      {String(product.ptaStatus || '').trim() ? (
+                        <span
+                          style={{
+                            backgroundColor: product.ptaStatus === 'PTA' ? '#dcfce7' : '#fee2e2',
+                            color: product.ptaStatus === 'PTA' ? '#166534' : '#b91c1c',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            fontSize: '13px',
+                            fontWeight: 600
+                          }}
+                        >
+                          {product.ptaStatus}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#94a3b8' }}>-</span>
+                      )}
                     </td>
                     <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontSize: '14px' }}>
                       <span
@@ -671,6 +696,32 @@ export default function InventoryList() {
                 }}
               />
             </div>
+
+            {String(editFormData.category || '').trim().toLowerCase().includes('mobile') && (
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-dark)', display: 'block', marginBottom: '5px' }}>
+                  Phone Status
+                </label>
+                <select
+                  value={editFormData.ptaStatus || ''}
+                  onChange={(e) => setEditFormData({ ...editFormData, ptaStatus: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: '1px solid #ccc',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    backgroundColor: 'var(--card)',
+                    color: 'var(--text-dark)',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <option value="">Select PTA status</option>
+                  <option value="PTA">PTA</option>
+                  <option value="NON-PTA">NON-PTA</option>
+                </select>
+              </div>
+            )}
 
             <div style={{ marginBottom: '15px' }}>
               <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-dark)', display: 'block', marginBottom: '5px' }}>
